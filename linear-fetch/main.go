@@ -67,7 +67,7 @@ query FetchCompletedIssues($after: String) {
       completedAt: { null: false }
       assignee: { null: false }
     }
-    orderBy: completedAt
+    orderBy: updatedAt
   ) {
     nodes {
       title
