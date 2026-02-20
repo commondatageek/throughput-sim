@@ -204,8 +204,9 @@ func Percentile(sorted []int, p float64) int {
 func usage() {
 	fmt.Fprintf(os.Stderr, "Usage: sim <command> [flags]\n\n")
 	fmt.Fprintf(os.Stderr, "Commands:\n")
-	fmt.Fprintf(os.Stderr, "  items   How many items can N engineers complete in D days?\n")
-	fmt.Fprintf(os.Stderr, "  days    How many days for N engineers to complete I items?\n\n")
+	fmt.Fprintf(os.Stderr, "  items        How many items can N engineers complete in D days?\n")
+	fmt.Fprintf(os.Stderr, "  days         How many days for N engineers to complete I items?\n")
+	fmt.Fprintf(os.Stderr, "  probability  What is the probability of completing I items in D days?\n\n")
 	fmt.Fprintf(os.Stderr, "Run 'sim <command> -help' for command-specific flags.\n")
 }
 
@@ -300,6 +301,35 @@ func cmdDays(args []string) error {
 	return nil
 }
 
+func cmdProbability(args []string) error {
+	cmd := flag.NewFlagSet("probability", flag.ExitOnError)
+	issuesFile := cmd.String("issues", "issues.json", "path to issues JSON file")
+	engineers := cmd.Int("engineers", 3, "number of engineers")
+	days := cmd.Int("days", 30, "number of days")
+	items := cmd.Int("items", 50, "number of items to complete")
+	simulations := cmd.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
+	cmd.Parse(args)
+
+	pool, err := loadPool(*issuesFile)
+	if err != nil {
+		return err
+	}
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	dist := SimulateItemsInDays(pool, *engineers, *days, *simulations, rng)
+
+	count := 0
+	for _, v := range dist {
+		if v >= *items {
+			count++
+		}
+	}
+	probability := float64(count) / float64(*simulations) * 100.0
+
+	fmt.Printf("%d engineers, %d days, %d items -> probability of completion?\n", *engineers, *days, *items)
+	fmt.Printf("  %.1f%%\n", probability)
+	return nil
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		usage()
@@ -312,6 +342,8 @@ func main() {
 		err = cmdItems(os.Args[2:])
 	case "days":
 		err = cmdDays(os.Args[2:])
+	case "probability":
+		err = cmdProbability(os.Args[2:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %q\n\n", os.Args[1])
 		usage()
