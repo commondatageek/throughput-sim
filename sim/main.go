@@ -235,7 +235,11 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "Run 'sim <command> -help' for command-specific flags.\n")
 }
 
-func loadPool(issuesFile string, includeEngineers []string) (*SamplePool, error) {
+func parseDate(s string) (time.Time, error) {
+	return time.ParseInLocation("2006-01-02", s, time.UTC)
+}
+
+func loadPool(issuesFile string, includeEngineers []string, startDate, endDate time.Time) (*SamplePool, error) {
 	data, err := os.ReadFile(issuesFile)
 	if err != nil {
 		return nil, fmt.Errorf("reading issues file: %w", err)
@@ -250,37 +254,40 @@ func loadPool(issuesFile string, includeEngineers []string) (*SamplePool, error)
 		issues = append(issues, issue)
 	}
 
-	var cache *SimCache
-	if cacheData, err := os.ReadFile("cache.json"); err == nil {
-		cache = &SimCache{}
-		if err := json.Unmarshal(cacheData, cache); err != nil {
-			return nil, fmt.Errorf("reading cache: %w", err)
-		}
-	} else {
-		startDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-		endDate := time.Date(2024, 12, 31, 0, 0, 0, 0, time.UTC)
-		globalExcluded := []string{"2024-12-23", "2024-12-24", "2024-12-25", "2024-12-26"}
-		cache = buildCache(issues, startDate, endDate, globalExcluded)
-		cacheData, _ := json.MarshalIndent(cache, "", "  ")
-		os.WriteFile("cache.json", cacheData, 0644)
-	}
-
+	cache := buildCache(issues, startDate, endDate, nil)
 	return loadPooledSamples(cache, includeEngineers)
 }
 
+func defaultDateRange() (start, end string) {
+	now := time.Now().UTC()
+	return now.AddDate(0, -6, 0).Format("2006-01-02"), now.Format("2006-01-02")
+}
+
 func cmdItems(args []string) error {
+	defaultStart, defaultEnd := defaultDateRange()
 	cmd := flag.NewFlagSet("items", flag.ExitOnError)
 	issuesFile := cmd.String("issues", "issues.json", "path to issues JSON file")
 	engineers := cmd.Int("engineers", 3, "number of engineers")
 	days := cmd.Int("days", 30, "number of days")
 	simulations := cmd.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
+	sampleStart := cmd.String("sample-start", defaultStart, "sample data start date (YYYY-MM-DD)")
+	sampleEnd := cmd.String("sample-end", defaultEnd, "sample data end date (YYYY-MM-DD)")
 	var percentiles percentileList
 	cmd.Var(&percentiles, "percentile", "comma-separated percentiles to output (default: 5,10,...,95)")
 	var include stringList
 	cmd.Var(&include, "include", "comma-separated list of engineer names to include (default: all)")
 	cmd.Parse(args)
 
-	pool, err := loadPool(*issuesFile, include)
+	startDate, err := parseDate(*sampleStart)
+	if err != nil {
+		return fmt.Errorf("invalid -sample-start date: %w", err)
+	}
+	endDate, err := parseDate(*sampleEnd)
+	if err != nil {
+		return fmt.Errorf("invalid -sample-end date: %w", err)
+	}
+
+	pool, err := loadPool(*issuesFile, include, startDate, endDate)
 	if err != nil {
 		return err
 	}
@@ -300,18 +307,30 @@ func cmdItems(args []string) error {
 }
 
 func cmdDays(args []string) error {
+	defaultSampleStart, defaultSampleEnd := defaultDateRange()
 	cmd := flag.NewFlagSet("days", flag.ExitOnError)
 	issuesFile := cmd.String("issues", "issues.json", "path to issues JSON file")
 	engineers := cmd.Int("engineers", 3, "number of engineers")
 	items := cmd.Int("items", 50, "number of items to complete")
 	simulations := cmd.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
+	sampleStart := cmd.String("sample-start", defaultSampleStart, "sample data start date (YYYY-MM-DD)")
+	sampleEnd := cmd.String("sample-end", defaultSampleEnd, "sample data end date (YYYY-MM-DD)")
 	var percentiles percentileList
 	cmd.Var(&percentiles, "percentile", "comma-separated percentiles to output (default: 5,10,...,95)")
 	var include stringList
 	cmd.Var(&include, "include", "comma-separated list of engineer names to include (default: all)")
 	cmd.Parse(args)
 
-	pool, err := loadPool(*issuesFile, include)
+	startDate, err := parseDate(*sampleStart)
+	if err != nil {
+		return fmt.Errorf("invalid -sample-start date: %w", err)
+	}
+	endDate, err := parseDate(*sampleEnd)
+	if err != nil {
+		return fmt.Errorf("invalid -sample-end date: %w", err)
+	}
+
+	pool, err := loadPool(*issuesFile, include, startDate, endDate)
 	if err != nil {
 		return err
 	}
@@ -331,17 +350,29 @@ func cmdDays(args []string) error {
 }
 
 func cmdProbability(args []string) error {
+	defaultStart, defaultEnd := defaultDateRange()
 	cmd := flag.NewFlagSet("probability", flag.ExitOnError)
 	issuesFile := cmd.String("issues", "issues.json", "path to issues JSON file")
 	engineers := cmd.Int("engineers", 3, "number of engineers")
 	days := cmd.Int("days", 30, "number of days")
 	items := cmd.Int("items", 50, "number of items to complete")
 	simulations := cmd.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
+	sampleStart := cmd.String("sample-start", defaultStart, "sample data start date (YYYY-MM-DD)")
+	sampleEnd := cmd.String("sample-end", defaultEnd, "sample data end date (YYYY-MM-DD)")
 	var include stringList
 	cmd.Var(&include, "include", "comma-separated list of engineer names to include (default: all)")
 	cmd.Parse(args)
 
-	pool, err := loadPool(*issuesFile, include)
+	startDate, err := parseDate(*sampleStart)
+	if err != nil {
+		return fmt.Errorf("invalid -sample-start date: %w", err)
+	}
+	endDate, err := parseDate(*sampleEnd)
+	if err != nil {
+		return fmt.Errorf("invalid -sample-end date: %w", err)
+	}
+
+	pool, err := loadPool(*issuesFile, include, startDate, endDate)
 	if err != nil {
 		return err
 	}
