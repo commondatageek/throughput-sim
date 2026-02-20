@@ -13,6 +13,24 @@ import (
 	"time"
 )
 
+// stringList is a flag.Value for a comma-separated list of strings.
+type stringList []string
+
+func (s *stringList) String() string {
+	return strings.Join(*s, ",")
+}
+
+func (s *stringList) Set(val string) error {
+	*s = nil
+	for _, part := range strings.Split(val, ",") {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			*s = append(*s, part)
+		}
+	}
+	return nil
+}
+
 // percentileList is a flag.Value for a comma-separated list of ints.
 type percentileList []int
 
@@ -108,7 +126,11 @@ func buildCache(issues []RawIssue, startDate, endDate time.Time, globalExcluded 
 
 // --- Load cache into a pooled SamplePool ---
 
-func loadPooledSamples(cache *SimCache) (*SamplePool, error) {
+func loadPooledSamples(cache *SimCache, includeEngineers []string) (*SamplePool, error) {
+	includeSet := make(map[string]bool, len(includeEngineers))
+	for _, name := range includeEngineers {
+		includeSet[name] = true
+	}
 	startDate, err := time.Parse("2006-01-02", cache.StartDate)
 	if err != nil {
 		return nil, err
@@ -127,7 +149,10 @@ func loadPooledSamples(cache *SimCache) (*SamplePool, error) {
 
 	pool := &SamplePool{}
 
-	for _, eng := range cache.Engineers {
+	for name, eng := range cache.Engineers {
+		if len(includeSet) > 0 && !includeSet[name] {
+			continue
+		}
 		// Per-engineer excluded dates
 		engExcluded := make(map[int]bool)
 		for k, v := range excluded {
@@ -210,7 +235,7 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "Run 'sim <command> -help' for command-specific flags.\n")
 }
 
-func loadPool(issuesFile string) (*SamplePool, error) {
+func loadPool(issuesFile string, includeEngineers []string) (*SamplePool, error) {
 	data, err := os.ReadFile(issuesFile)
 	if err != nil {
 		return nil, fmt.Errorf("reading issues file: %w", err)
@@ -240,7 +265,7 @@ func loadPool(issuesFile string) (*SamplePool, error) {
 		os.WriteFile("cache.json", cacheData, 0644)
 	}
 
-	return loadPooledSamples(cache)
+	return loadPooledSamples(cache, includeEngineers)
 }
 
 func cmdItems(args []string) error {
@@ -251,9 +276,11 @@ func cmdItems(args []string) error {
 	simulations := cmd.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
 	var percentiles percentileList
 	cmd.Var(&percentiles, "percentile", "comma-separated percentiles to output (default: 5,10,...,95)")
+	var include stringList
+	cmd.Var(&include, "include", "comma-separated list of engineer names to include (default: all)")
 	cmd.Parse(args)
 
-	pool, err := loadPool(*issuesFile)
+	pool, err := loadPool(*issuesFile, include)
 	if err != nil {
 		return err
 	}
@@ -280,9 +307,11 @@ func cmdDays(args []string) error {
 	simulations := cmd.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
 	var percentiles percentileList
 	cmd.Var(&percentiles, "percentile", "comma-separated percentiles to output (default: 5,10,...,95)")
+	var include stringList
+	cmd.Var(&include, "include", "comma-separated list of engineer names to include (default: all)")
 	cmd.Parse(args)
 
-	pool, err := loadPool(*issuesFile)
+	pool, err := loadPool(*issuesFile, include)
 	if err != nil {
 		return err
 	}
@@ -308,9 +337,11 @@ func cmdProbability(args []string) error {
 	days := cmd.Int("days", 30, "number of days")
 	items := cmd.Int("items", 50, "number of items to complete")
 	simulations := cmd.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
+	var include stringList
+	cmd.Var(&include, "include", "comma-separated list of engineer names to include (default: all)")
 	cmd.Parse(args)
 
-	pool, err := loadPool(*issuesFile)
+	pool, err := loadPool(*issuesFile, include)
 	if err != nil {
 		return err
 	}
