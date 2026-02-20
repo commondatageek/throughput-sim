@@ -6,13 +6,11 @@ tasks:
     cmd: python generate-issues/main.py > issues.json
 
   build:
-    desc: Build all Go commands to the top-level directory
+    desc: Build all Go commands to bin/
     cmds:
-      - cmd: go build -o ../throughput-sim .
-        dir: sim
-      - cmd: go build -o ../linear-fetch .
-        dir: linear-fetch
+      - go build -C sim -o ../bin/throughput-sim .
+      - go build -C linear-fetch -o ../bin/linear-fetch .
 
   fetch:
     desc: Fetch completed issues from Linear and write to issues.json (requires LINEAR_API_KEY)
-    cmd: ./linear-fetch > issues.json
+    cmd: ./bin/linear-fetch > issues.json

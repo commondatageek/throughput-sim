@@ -1,3 +1,2 @@
 *.json
-throughput-sim
-linear-fetch
+/bin
