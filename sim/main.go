@@ -158,7 +158,7 @@ func parseDate(s string) (time.Time, error) {
 	return time.ParseInLocation("2006-01-02", s, time.UTC)
 }
 
-func loadPool(issuesFile, exclusionsFile string, includeEngineers []string, startDate, endDate time.Time) (*SamplePool, error) {
+func loadPool(issuesFile, exclusionsFile string, includeEngineers []string, startDate, endDate time.Time, wholeTeam bool) (*SamplePool, error) {
 	data, err := os.ReadFile(issuesFile)
 	if err != nil {
 		return nil, fmt.Errorf("reading issues file: %w", err)
@@ -230,29 +230,58 @@ func loadPool(issuesFile, exclusionsFile string, includeEngineers []string, star
 	}
 
 	pool := &SamplePool{}
-	for name, eng := range engineers {
-		// Per-engineer excluded set = global + engineer-specific
-		excluded := make(map[int]bool, len(globalExcluded))
-		for k := range globalExcluded {
-			excluded[k] = true
-		}
-		for _, ds := range exc.Engineers[name] {
-			t, err := time.ParseInLocation("2006-01-02", ds, time.UTC)
-			if err != nil {
-				continue
-			}
-			idx := int(t.Sub(startDate).Hours() / 24)
-			excluded[idx] = true
-		}
 
-		for i, count := range eng.counts {
-			if !excluded[i] {
+	if wholeTeam {
+		// Sum all engineers' completions per day into a single team-level sample.
+		// Only global exclusions apply — per-engineer exclusions are irrelevant when
+		// treating the team as a unit.
+		teamCounts := make([]int, totalDays)
+		for _, eng := range engineers {
+			for i, count := range eng.counts {
+				teamCounts[i] += count
+			}
+		}
+		for i, count := range teamCounts {
+			if !globalExcluded[i] {
 				pool.Samples = append(pool.Samples, count)
+			}
+		}
+	} else {
+		for name, eng := range engineers {
+			// Per-engineer excluded set = global + engineer-specific
+			excluded := make(map[int]bool, len(globalExcluded))
+			for k := range globalExcluded {
+				excluded[k] = true
+			}
+			for _, ds := range exc.Engineers[name] {
+				t, err := time.ParseInLocation("2006-01-02", ds, time.UTC)
+				if err != nil {
+					continue
+				}
+				idx := int(t.Sub(startDate).Hours() / 24)
+				excluded[idx] = true
+			}
+
+			for i, count := range eng.counts {
+				if !excluded[i] {
+					pool.Samples = append(pool.Samples, count)
+				}
 			}
 		}
 	}
 
 	return pool, nil
+}
+
+// isFlagSet reports whether a flag was explicitly provided on the command line.
+func isFlagSet(fs *flag.FlagSet, name string) bool {
+	found := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			found = true
+		}
+	})
+	return found
 }
 
 func defaultDateRange() (start, end string) {
@@ -267,6 +296,7 @@ func cmdItems(args []string) error {
 	exclusionsFile := cmd.String("exclusions", "exclusions.json", "path to exclusions JSON file")
 	engineers := cmd.Int("engineers", 3, "number of engineers")
 	days := cmd.Int("days", 30, "number of days")
+	wholeTeam := cmd.Bool("whole-team", false, "use whole-team daily throughput from historical data (ignores -engineers)")
 	simulations := cmd.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
 	sampleStart := cmd.String("sample-start", defaultStart, "sample data start date (YYYY-MM-DD)")
 	sampleEnd := cmd.String("sample-end", defaultEnd, "sample data end date (YYYY-MM-DD)")
@@ -275,6 +305,10 @@ func cmdItems(args []string) error {
 	var include stringList
 	cmd.Var(&include, "include", "comma-separated list of engineer names to include (default: all)")
 	cmd.Parse(args)
+
+	if *wholeTeam && isFlagSet(cmd, "engineers") {
+		return fmt.Errorf("-whole-team and -engineers are mutually exclusive")
+	}
 
 	startDate, err := parseDate(*sampleStart)
 	if err != nil {
@@ -285,13 +319,23 @@ func cmdItems(args []string) error {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}
 
-	pool, err := loadPool(*issuesFile, *exclusionsFile, include, startDate, endDate)
+	pool, err := loadPool(*issuesFile, *exclusionsFile, include, startDate, endDate, *wholeTeam)
 	if err != nil {
 		return err
 	}
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	dist := SimulateItemsInDays(pool, *engineers, *days, *simulations, rng)
-	fmt.Printf("%d engineers, %d days -> how many items?\n", *engineers, *days)
+
+	numEngineers := *engineers
+	if *wholeTeam {
+		numEngineers = 1
+	}
+
+	dist := SimulateItemsInDays(pool, numEngineers, *days, *simulations, rng)
+	if *wholeTeam {
+		fmt.Printf("whole-team throughput, %d days -> how many items?\n", *days)
+	} else {
+		fmt.Printf("%d engineers, %d days -> how many items?\n", numEngineers, *days)
+	}
 	if len(percentiles) == 0 {
 		percentiles = percentileList{5, 25, 50, 75, 95}
 	}
@@ -308,6 +352,7 @@ func cmdDays(args []string) error {
 	exclusionsFile := cmd.String("exclusions", "exclusions.json", "path to exclusions JSON file")
 	engineers := cmd.Int("engineers", 3, "number of engineers")
 	items := cmd.Int("items", 50, "number of items to complete")
+	wholeTeam := cmd.Bool("whole-team", false, "use whole-team daily throughput from historical data (ignores -engineers)")
 	simulations := cmd.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
 	sampleStart := cmd.String("sample-start", defaultSampleStart, "sample data start date (YYYY-MM-DD)")
 	sampleEnd := cmd.String("sample-end", defaultSampleEnd, "sample data end date (YYYY-MM-DD)")
@@ -316,6 +361,10 @@ func cmdDays(args []string) error {
 	var include stringList
 	cmd.Var(&include, "include", "comma-separated list of engineer names to include (default: all)")
 	cmd.Parse(args)
+
+	if *wholeTeam && isFlagSet(cmd, "engineers") {
+		return fmt.Errorf("-whole-team and -engineers are mutually exclusive")
+	}
 
 	startDate, err := parseDate(*sampleStart)
 	if err != nil {
@@ -326,13 +375,23 @@ func cmdDays(args []string) error {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}
 
-	pool, err := loadPool(*issuesFile, *exclusionsFile, include, startDate, endDate)
+	pool, err := loadPool(*issuesFile, *exclusionsFile, include, startDate, endDate, *wholeTeam)
 	if err != nil {
 		return err
 	}
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	dist := SimulateDaysToComplete(pool, *engineers, *items, *simulations, rng)
-	fmt.Printf("%d engineers, %d items -> how many days?\n", *engineers, *items)
+
+	numEngineers := *engineers
+	if *wholeTeam {
+		numEngineers = 1
+	}
+
+	dist := SimulateDaysToComplete(pool, numEngineers, *items, *simulations, rng)
+	if *wholeTeam {
+		fmt.Printf("whole-team throughput, %d items -> how many days?\n", *items)
+	} else {
+		fmt.Printf("%d engineers, %d items -> how many days?\n", numEngineers, *items)
+	}
 	if len(percentiles) == 0 {
 		percentiles = percentileList{50, 75, 85, 95}
 	}
@@ -350,12 +409,17 @@ func cmdProbability(args []string) error {
 	engineers := cmd.Int("engineers", 3, "number of engineers")
 	days := cmd.Int("days", 30, "number of days")
 	items := cmd.Int("items", -1, "number of items to complete (omit to show full distribution)")
+	wholeTeam := cmd.Bool("whole-team", false, "use whole-team daily throughput from historical data (ignores -engineers)")
 	simulations := cmd.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
 	sampleStart := cmd.String("sample-start", defaultStart, "sample data start date (YYYY-MM-DD)")
 	sampleEnd := cmd.String("sample-end", defaultEnd, "sample data end date (YYYY-MM-DD)")
 	var include stringList
 	cmd.Var(&include, "include", "comma-separated list of engineer names to include (default: all)")
 	cmd.Parse(args)
+
+	if *wholeTeam && isFlagSet(cmd, "engineers") {
+		return fmt.Errorf("-whole-team and -engineers are mutually exclusive")
+	}
 
 	startDate, err := parseDate(*sampleStart)
 	if err != nil {
@@ -366,12 +430,18 @@ func cmdProbability(args []string) error {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}
 
-	pool, err := loadPool(*issuesFile, *exclusionsFile, include, startDate, endDate)
+	pool, err := loadPool(*issuesFile, *exclusionsFile, include, startDate, endDate, *wholeTeam)
 	if err != nil {
 		return err
 	}
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	dist := SimulateItemsInDays(pool, *engineers, *days, *simulations, rng)
+
+	numEngineers := *engineers
+	if *wholeTeam {
+		numEngineers = 1
+	}
+
+	dist := SimulateItemsInDays(pool, numEngineers, *days, *simulations, rng)
 
 	probFor := func(n int) float64 {
 		count := 0
@@ -383,16 +453,32 @@ func cmdProbability(args []string) error {
 		return float64(count) / float64(*simulations) * 100.0
 	}
 
-	if *items >= 0 {
-		fmt.Printf("%d engineers, %d days, %d items -> probability of completion?\n", *engineers, *days, *items)
-		fmt.Printf("  %.1f%%\n", probFor(*items))
+	if *wholeTeam {
+		if *items >= 0 {
+			fmt.Printf("whole-team throughput, %d days, %d items -> probability of completion?\n", *days, *items)
+			fmt.Printf("  %.1f%%\n", probFor(*items))
+		} else {
+			fmt.Printf("whole-team throughput, %d days -> probability of completing N items\n", *days)
+			for n := 1; ; n++ {
+				p := probFor(n)
+				fmt.Printf("  %d items: %.1f%%\n", n, p)
+				if p == 0 {
+					break
+				}
+			}
+		}
 	} else {
-		fmt.Printf("%d engineers, %d days -> probability of completing N items\n", *engineers, *days)
-		for n := 1; ; n++ {
-			p := probFor(n)
-			fmt.Printf("  %d items: %.1f%%\n", n, p)
-			if p == 0 {
-				break
+		if *items >= 0 {
+			fmt.Printf("%d engineers, %d days, %d items -> probability of completion?\n", numEngineers, *days, *items)
+			fmt.Printf("  %.1f%%\n", probFor(*items))
+		} else {
+			fmt.Printf("%d engineers, %d days -> probability of completing N items\n", numEngineers, *days)
+			for n := 1; ; n++ {
+				p := probFor(n)
+				fmt.Printf("  %d items: %.1f%%\n", n, p)
+				if p == 0 {
+					break
+				}
 			}
 		}
 	}
