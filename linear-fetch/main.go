@@ -33,12 +33,18 @@ type teamRef struct {
 	Name string `json:"name"`
 }
 
+type projectRef struct {
+	Name string `json:"name"`
+}
+
 type issueNode struct {
-	Identifier  string    `json:"identifier"`
-	Title       string    `json:"title"`
-	CompletedAt time.Time `json:"completedAt"`
-	Assignee    *assignee `json:"assignee"`
-	Team        *teamRef  `json:"team"`
+	Identifier  string       `json:"identifier"`
+	Title       string       `json:"title"`
+	StartedAt   time.Time    `json:"startedAt"`
+	CompletedAt time.Time    `json:"completedAt"`
+	Assignee    *assignee    `json:"assignee"`
+	Team        *teamRef     `json:"team"`
+	Project     *projectRef  `json:"project"`
 }
 
 type issuesConnection struct {
@@ -96,7 +102,10 @@ type outputIssue struct {
 	Team        string `json:"team"`
 	Identifier  string `json:"identifier"`
 	Title       string `json:"title"`
-	CompletedAt string `json:"completed_at"`
+	Project     string `json:"project"`
+	StartedAt   string `json:"started_at,omitempty"`
+	CompletedAt string `json:"completed_at,omitempty"`
+	Status      string `json:"status"`
 }
 
 func buildQuery(teamKey string) string {
@@ -105,13 +114,12 @@ func buildQuery(teamKey string) string {
 		teamFilter = fmt.Sprintf("      team: { key: { eq: %q } }\n", teamKey)
 	}
 	return fmt.Sprintf(`
-query FetchCompletedIssues($after: String) {
+query FetchIssues($after: String) {
   issues(
     first: 250
     after: $after
     filter: {
-      state: { type: { eq: "completed" } }
-      completedAt: { null: false }
+      state: { type: { in: ["completed", "started"] } }
       assignee: { null: false }
 %s    }
     orderBy: updatedAt
@@ -119,11 +127,15 @@ query FetchCompletedIssues($after: String) {
     nodes {
       identifier
       title
+      startedAt
       completedAt
       assignee {
         name
       }
       team {
+        name
+      }
+      project {
         name
       }
     }
@@ -249,7 +261,7 @@ func main() {
 	if *teamKey != "" {
 		fmt.Fprintf(os.Stderr, "filtering to team: %s\n", *teamKey)
 	} else {
-		fmt.Fprintln(os.Stderr, "fetching issues for all accessible teams")
+		fmt.Fprintln(os.Stderr, "fetching completed and in-progress issues for all accessible teams")
 	}
 
 	query := buildQuery(*teamKey)
@@ -266,19 +278,46 @@ func main() {
 		}
 
 		for _, node := range resp.Data.Issues.Nodes {
-			if node.Assignee == nil || node.CompletedAt.IsZero() {
+			if node.Assignee == nil {
 				continue
 			}
+
+			status := "in_progress"
+			if !node.CompletedAt.IsZero() {
+				status = "completed"
+			}
+
+			// In-progress issues without a startedAt can't be aged
+			if status == "in_progress" && node.StartedAt.IsZero() {
+				continue
+			}
+
 			teamName := ""
 			if node.Team != nil {
 				teamName = node.Team.Name
 			}
+			projectName := ""
+			if node.Project != nil {
+				projectName = node.Project.Name
+			}
+			startedAt := ""
+			if !node.StartedAt.IsZero() {
+				startedAt = node.StartedAt.UTC().Format(time.RFC3339)
+			}
+			completedAt := ""
+			if !node.CompletedAt.IsZero() {
+				completedAt = node.CompletedAt.UTC().Format(time.RFC3339)
+			}
+
 			out := outputIssue{
 				Engineer:    node.Assignee.Name,
 				Team:        teamName,
 				Identifier:  node.Identifier,
 				Title:       node.Title,
-				CompletedAt: node.CompletedAt.UTC().Format(time.RFC3339),
+				Project:     projectName,
+				StartedAt:   startedAt,
+				CompletedAt: completedAt,
+				Status:      status,
 			}
 			if err := enc.Encode(out); err != nil {
 				fmt.Fprintf(os.Stderr, "error encoding output: %v\n", err)
