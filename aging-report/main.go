@@ -7,7 +7,9 @@ import (
 	"html/template"
 	"math"
 	"os"
+	"regexp"
 	"sort"
+	"strconv"
 	"text/tabwriter"
 	"time"
 )
@@ -35,6 +37,44 @@ type reportItem struct {
 
 func parseDate(s string) (time.Time, error) {
 	return time.ParseInLocation("2006-01-02", s, time.UTC)
+}
+
+var durationTermRe = regexp.MustCompile(`^([0-9]*\.?[0-9]+)([a-zµ]+)`)
+
+// parseFlexibleDuration parses a duration string, extending time.ParseDuration
+// with a "d" (day) unit so expressions like "1d" or "1d12h" are accepted.
+func parseFlexibleDuration(s string) (time.Duration, error) {
+	if d, err := time.ParseDuration(s); err == nil {
+		return d, nil
+	}
+	if s == "" {
+		return 0, fmt.Errorf("invalid duration %q", s)
+	}
+	var total time.Duration
+	rest := s
+	for rest != "" {
+		m := durationTermRe.FindStringSubmatch(rest)
+		if m == nil {
+			return 0, fmt.Errorf("invalid duration %q", s)
+		}
+		n, err := strconv.ParseFloat(m[1], 64)
+		if err != nil {
+			return 0, fmt.Errorf("invalid duration %q", s)
+		}
+		var unitDur time.Duration
+		if m[2] == "d" {
+			unitDur = 24 * time.Hour
+		} else {
+			d, err := time.ParseDuration("1" + m[2])
+			if err != nil {
+				return 0, fmt.Errorf("invalid duration %q: unknown unit %q", s, m[2])
+			}
+			unitDur = d
+		}
+		total += time.Duration(n * float64(unitDur))
+		rest = rest[len(m[0]):]
+	}
+	return total, nil
 }
 
 func ordinalSuffix(n int) string {
@@ -82,7 +122,18 @@ func main() {
 	sampleStartStr := flag.String("sample-start", "", "Start of completed-issue window (YYYY-MM-DD, default: today minus 3 months)")
 	sampleEndStr := flag.String("sample-end", "", "End of completed-issue window (YYYY-MM-DD, default: today)")
 	format := flag.String("format", "text", "Output format: text, json, html")
+	minCycleTimeStr := flag.String("min-cycle-time", "", "Exclude completed issues with cycle time below this duration from the percentile distribution (e.g. 5m, 1h, 1d)")
 	flag.Parse()
+
+	var minCycleTime time.Duration
+	if *minCycleTimeStr != "" {
+		d, err := parseFlexibleDuration(*minCycleTimeStr)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: invalid -min-cycle-time %q: %v\n", *minCycleTimeStr, err)
+			os.Exit(1)
+		}
+		minCycleTime = d
+	}
 
 	today := time.Now().UTC().Truncate(24 * time.Hour)
 
@@ -142,7 +193,11 @@ func main() {
 			if completedAt.Before(sampleStart) || completedAt.After(sampleEnd) {
 				continue
 			}
-			days := completedAt.Sub(startedAt).Hours() / 24
+			cycleTime := completedAt.Sub(startedAt)
+			if cycleTime < minCycleTime {
+				continue
+			}
+			days := cycleTime.Hours() / 24
 			if days >= 0 {
 				cycleTimes = append(cycleTimes, days)
 			}
