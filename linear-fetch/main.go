@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -85,6 +86,23 @@ type teamsResponse struct {
 	} `json:"errors"`
 }
 
+type teamList []string
+
+func (t *teamList) String() string {
+	return strings.Join(*t, ",")
+}
+
+func (t *teamList) Set(val string) error {
+	*t = nil
+	for _, part := range strings.Split(val, ",") {
+		part = strings.ToUpper(strings.TrimSpace(part))
+		if part != "" {
+			*t = append(*t, part)
+		}
+	}
+	return nil
+}
+
 const teamsQuery = `
 query {
   teams {
@@ -108,10 +126,14 @@ type outputIssue struct {
 	Status      string `json:"status"`
 }
 
-func buildQuery(teamKey string) string {
+func buildQuery(teamKeys []string) string {
 	teamFilter := ""
-	if teamKey != "" {
-		teamFilter = fmt.Sprintf("      team: { key: { eq: %q } }\n", teamKey)
+	if len(teamKeys) > 0 {
+		quoted := make([]string, len(teamKeys))
+		for i, k := range teamKeys {
+			quoted[i] = fmt.Sprintf("%q", k)
+		}
+		teamFilter = fmt.Sprintf("      team: { key: { in: [%s] } }\n", strings.Join(quoted, ", "))
 	}
 	return fmt.Sprintf(`
 query FetchIssues($after: String) {
@@ -238,7 +260,9 @@ func fetchPage(client *http.Client, apiKey, query, cursor string) (*gqlResponse,
 }
 
 func main() {
-	teamKey := flag.String("team", "", "Linear team key to filter by (e.g. ENG); omit to fetch all accessible teams")
+	var teams teamList
+	flag.Var(&teams, "teams", "comma-separated list of Linear team keys (e.g. ENG,DESIGN); required unless -all-teams")
+	allTeams := flag.Bool("all-teams", false, "fetch issues for all accessible teams; mutually exclusive with -teams")
 	listTeamsFlag := flag.Bool("list-teams", false, "List accessible teams and their keys, then exit")
 	flag.Parse()
 
@@ -258,13 +282,22 @@ func main() {
 		return
 	}
 
-	if *teamKey != "" {
-		fmt.Fprintf(os.Stderr, "filtering to team: %s\n", *teamKey)
-	} else {
-		fmt.Fprintln(os.Stderr, "fetching completed and in-progress issues for all accessible teams")
+	if *allTeams && len(teams) > 0 {
+		fmt.Fprintln(os.Stderr, "error: -teams and -all-teams are mutually exclusive")
+		os.Exit(1)
+	}
+	if !*allTeams && len(teams) == 0 {
+		fmt.Fprintln(os.Stderr, "error: must specify -teams (comma-separated team keys) or -all-teams")
+		os.Exit(1)
 	}
 
-	query := buildQuery(*teamKey)
+	if *allTeams {
+		fmt.Fprintln(os.Stderr, "fetching completed and in-progress issues for all accessible teams")
+	} else {
+		fmt.Fprintf(os.Stderr, "filtering to teams: %s\n", strings.Join(teams, ", "))
+	}
+
+	query := buildQuery(teams)
 	enc := json.NewEncoder(os.Stdout)
 
 	var cursor string

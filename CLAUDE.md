@@ -73,7 +73,7 @@ It reads `issues.json` and `exclusions.json`, builds a `SamplePool` of historica
 ./bin/sim items -engineers 4 -days 30 -issues issues.json
 ./bin/sim days -engineers 3 -items 80 -issues issues.json
 ./bin/sim probability -engineers 5 -days 14 -items 40 -issues issues.json
-LINEAR_API_KEY=... ./bin/linear-fetch > issues.json
+LINEAR_API_KEY=... ./bin/linear-fetch -teams ENG > issues.json
 ```
 
 ## On-call modeling
