@@ -8,10 +8,10 @@ tasks:
   build:
     desc: Build all Go commands to bin/
     cmds:
-      - go build -C sim -o ../bin/sim .
-      - go build -C linear-fetch -o ../bin/linear-fetch .
-      - go build -C aging-report -o ../bin/aging-report .
-      - go build -o bin/sync ./sync
+      - go build -C cmd/aging-report -o ../bin/aging-report .
+      - go build -C cmd/linear-fetch -o ../bin/linear-fetch .
+      - go build -C cmd/sim -o ../bin/sim .
+      - go build -C cmd/sync -o ../bin/sync .
 
   fetch:
     desc: Fetch completed issues from Linear and persist to items.db (requires LINEAR_API_KEY)
