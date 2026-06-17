@@ -223,7 +223,7 @@ func buildQuery(teamKeys []string, since time.Time) string {
 	}
 
 	if !since.IsZero() {
-		filters = append(filters, fmt.Sprintf("      updatedAt: { gt: %q }", since.UTC().Format(time.RFC3339)))
+		filters = append(filters, fmt.Sprintf("      updatedAt: { gt: %q }", since.UTC().Format(time.RFC3339Nano)))
 	}
 
 	return fmt.Sprintf(`
