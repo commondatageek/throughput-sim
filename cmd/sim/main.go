@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"forecasting/internal/sqlite"
+
+	"github.com/mattn/go-isatty"
 )
 
 // stringList is a flag.Value for a comma-separated list of strings.
@@ -108,6 +110,37 @@ func (p *SamplePool) GetCombinedSamples() []int {
 	return combined
 }
 
+// --- Progress reporting ---
+
+// progressBar renders a simple text progress bar to stderr, updating
+// at most ~200 times over the run so it doesn't slow down tight loops.
+// It's a no-op when stderr isn't a terminal (e.g. piped output, CI logs).
+type progressBar struct {
+	enabled bool
+	total   int
+	step    int
+}
+
+func newProgressBar(total int) *progressBar {
+	return &progressBar{
+		enabled: isatty.IsTerminal(os.Stderr.Fd()) && total > 0,
+		total:   total,
+		step:    max(1, total/200),
+	}
+}
+
+func (b *progressBar) update(done int) {
+	if !b.enabled || (done != b.total && done%b.step != 0) {
+		return
+	}
+	const width = 30
+	filled := width * done / b.total
+	fmt.Fprintf(os.Stderr, "\r[%s%s] %d/%d", strings.Repeat("=", filled), strings.Repeat(" ", width-filled), done, b.total)
+	if done == b.total {
+		fmt.Fprint(os.Stderr, "\r\033[K")
+	}
+}
+
 // --- Simulation ---
 
 // SimulateItemsInDays runs N simulations and returns the distribution of
@@ -115,6 +148,7 @@ func (p *SamplePool) GetCombinedSamples() []int {
 // samples is a flat slice of daily completion counts to sample from.
 func SimulateItemsInDays(samples []int, numDailyDraws, days, numSimulations int, rng *rand.Rand) []int {
 	results := make([]int, numSimulations)
+	bar := newProgressBar(numSimulations)
 	for i := range results {
 		total := 0
 		for e := 0; e < numDailyDraws; e++ {
@@ -123,6 +157,7 @@ func SimulateItemsInDays(samples []int, numDailyDraws, days, numSimulations int,
 			}
 		}
 		results[i] = total
+		bar.update(i + 1)
 	}
 	sort.Ints(results)
 	return results
@@ -132,6 +167,7 @@ func SimulateItemsInDays(samples []int, numDailyDraws, days, numSimulations int,
 // where each engineer samples from their own historical performance pool.
 func SimulateItemsInDaysPerEngineer(pool *SamplePool, teamMembers []string, days, numSimulations int, rng *rand.Rand) []int {
 	results := make([]int, numSimulations)
+	bar := newProgressBar(numSimulations)
 	for i := range results {
 		total := 0
 		for _, engineer := range teamMembers {
@@ -140,6 +176,7 @@ func SimulateItemsInDaysPerEngineer(pool *SamplePool, teamMembers []string, days
 			}
 		}
 		results[i] = total
+		bar.update(i + 1)
 	}
 	sort.Ints(results)
 	return results
@@ -149,6 +186,7 @@ func SimulateItemsInDaysPerEngineer(pool *SamplePool, teamMembers []string, days
 // where each engineer samples from their own historical performance pool.
 func SimulateDaysToCompletePerEngineer(pool *SamplePool, teamMembers []string, items, numSimulations int, rng *rand.Rand) []int {
 	results := make([]int, numSimulations)
+	bar := newProgressBar(numSimulations)
 	for i := range results {
 		completed := 0
 		days := 0
@@ -159,6 +197,7 @@ func SimulateDaysToCompletePerEngineer(pool *SamplePool, teamMembers []string, i
 			}
 		}
 		results[i] = days
+		bar.update(i + 1)
 	}
 	sort.Ints(results)
 	return results
@@ -169,6 +208,7 @@ func SimulateDaysToCompletePerEngineer(pool *SamplePool, teamMembers []string, i
 // samples is a flat slice of daily completion counts to sample from.
 func SimulateDaysToComplete(samples []int, numEngineers, items, numSimulations int, rng *rand.Rand) []int {
 	results := make([]int, numSimulations)
+	bar := newProgressBar(numSimulations)
 	for i := range results {
 		completed := 0
 		days := 0
@@ -179,6 +219,7 @@ func SimulateDaysToComplete(samples []int, numEngineers, items, numSimulations i
 			}
 		}
 		results[i] = days
+		bar.update(i + 1)
 	}
 	sort.Ints(results)
 	return results
