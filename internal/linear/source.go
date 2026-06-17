@@ -231,6 +231,7 @@ query FetchIssues($after: String) {
   issues(
     first: 250
     after: $after
+    includeArchived: true
     filter: {
 %s
     }
