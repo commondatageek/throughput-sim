@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"forecasting/internal/linear"
-	internalsync "forecasting/internal/sync"
 	"forecasting/internal/sqlite"
+	internalsync "forecasting/internal/sync"
 )
 
 func main() {

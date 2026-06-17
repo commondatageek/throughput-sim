@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"time"
 
@@ -109,11 +110,17 @@ ON CONFLICT(source, identifier) DO UPDATE SET
 // LatestUpdatedAt returns the maximum updated_at for items from source.
 // Returns zero time if no items exist yet (signals a full fetch).
 func (s *Store) LatestUpdatedAt(ctx context.Context, source string) (time.Time, error) {
+	// Selecting the updated_at column directly (rather than MAX(updated_at))
+	// keeps the result typed as DATETIME, which the sqlite driver requires
+	// in order to scan it back into a time.Time instead of a string.
 	row := s.db.QueryRowContext(ctx,
-		`SELECT MAX(updated_at) FROM items WHERE source = ?`, source)
+		`SELECT updated_at FROM items WHERE source = ? ORDER BY updated_at DESC LIMIT 1`, source)
 
 	var ts sql.NullTime
 	if err := row.Scan(&ts); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return time.Time{}, nil
+		}
 		return time.Time{}, fmt.Errorf("latest updated_at: %w", err)
 	}
 	if !ts.Valid {

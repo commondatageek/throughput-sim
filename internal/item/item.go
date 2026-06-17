@@ -7,13 +7,13 @@ import (
 
 // Item is the vendor-neutral record produced by every Source and persisted by the store.
 type Item struct {
-	Source      string    // "linear", "jira", ...
-	Identifier  string    // human id, e.g. "ENG-123" — unique within a source
+	Source      string // "linear", "jira", ...
+	Identifier  string // human id, e.g. "ENG-123" — unique within a source
 	Title       string
 	Assignee    string
 	Team        string
 	Project     string
-	Status      string    // plain string for now: "completed", "started", ...
+	Status      string // plain string for now: "completed", "started", ...
 	CreatedAt   time.Time
 	StartedAt   time.Time
 	CompletedAt time.Time
