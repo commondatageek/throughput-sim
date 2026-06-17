@@ -11,7 +11,8 @@ tasks:
       - go build -C sim -o ../bin/sim .
       - go build -C linear-fetch -o ../bin/linear-fetch .
       - go build -C aging-report -o ../bin/aging-report .
+      - go build -o bin/sync ./sync
 
   fetch:
-    desc: Fetch completed issues from Linear and write to issues.json (requires LINEAR_API_KEY)
-    cmd: ./bin/linear-fetch > issues.json
+    desc: Fetch completed issues from Linear and persist to items.db (requires LINEAR_API_KEY)
+    cmd: ./bin/sync -source linear -db items.db
