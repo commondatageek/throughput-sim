@@ -509,6 +509,15 @@ func defaultDateRange() (start, end string) {
 	return now.AddDate(0, -6, 0).Format("2006-01-02"), now.Format("2006-01-02")
 }
 
+// resolveSeed returns randomSeed if -random-seed was explicitly set, otherwise
+// a time-based seed so runs are non-deterministic by default.
+func resolveSeed(cmd *flag.FlagSet, randomSeed int64) int64 {
+	if isFlagSet(cmd, "random-seed") {
+		return randomSeed
+	}
+	return time.Now().UnixNano()
+}
+
 // cmdItems
 func cmdItems(args []string) error {
 	defaultStart, defaultEnd := defaultDateRange()
@@ -523,6 +532,7 @@ func cmdItems(args []string) error {
 	goroutines := cmd.Int("goroutines", runtime.NumCPU(), "number of parallel worker goroutines")
 	sampleStart := cmd.String("sample-start", defaultStart, "sample data start date (YYYY-MM-DD)")
 	sampleEnd := cmd.String("sample-end", defaultEnd, "sample data end date (YYYY-MM-DD)")
+	randomSeed := cmd.Int64("random-seed", 0, "seed for the random number generator (default: time-based, non-deterministic)")
 	var percentiles percentileList
 	cmd.Var(&percentiles, "percentile", "comma-separated percentiles to output (default: 5,25,50,75,95)")
 	var include stringList
@@ -554,7 +564,7 @@ func cmdItems(args []string) error {
 	if err != nil {
 		return err
 	}
-	seed := time.Now().UnixNano()
+	seed := resolveSeed(cmd, *randomSeed)
 
 	var dist []int
 	if len(team) > 0 {
@@ -599,6 +609,7 @@ func cmdDays(args []string) error {
 	goroutines := cmd.Int("goroutines", runtime.NumCPU(), "number of parallel worker goroutines")
 	sampleStart := cmd.String("sample-start", defaultSampleStart, "sample data start date (YYYY-MM-DD)")
 	sampleEnd := cmd.String("sample-end", defaultSampleEnd, "sample data end date (YYYY-MM-DD)")
+	randomSeed := cmd.Int64("random-seed", 0, "seed for the random number generator (default: time-based, non-deterministic)")
 	var percentiles percentileList
 	cmd.Var(&percentiles, "percentile", "comma-separated percentiles to output (default: 50,75,85,95)")
 	var include stringList
@@ -630,7 +641,7 @@ func cmdDays(args []string) error {
 	if err != nil {
 		return err
 	}
-	seed := time.Now().UnixNano()
+	seed := resolveSeed(cmd, *randomSeed)
 
 	var dist []int
 	if len(team) > 0 {
@@ -676,6 +687,7 @@ func cmdProbability(args []string) error {
 	goroutines := cmd.Int("goroutines", runtime.NumCPU(), "number of parallel worker goroutines")
 	sampleStart := cmd.String("sample-start", defaultStart, "sample data start date (YYYY-MM-DD)")
 	sampleEnd := cmd.String("sample-end", defaultEnd, "sample data end date (YYYY-MM-DD)")
+	randomSeed := cmd.Int64("random-seed", 0, "seed for the random number generator (default: time-based, non-deterministic)")
 	var include stringList
 	cmd.Var(&include, "include", "comma-separated list of engineer names to include (default: all)")
 	var team stringList
@@ -705,7 +717,7 @@ func cmdProbability(args []string) error {
 	if err != nil {
 		return err
 	}
-	seed := time.Now().UnixNano()
+	seed := resolveSeed(cmd, *randomSeed)
 
 	var dist []int
 	var modeDescription string
