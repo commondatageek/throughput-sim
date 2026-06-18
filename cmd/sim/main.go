@@ -355,6 +355,21 @@ func Percentile(sorted []int, p float64) int {
 	return sorted[idx]
 }
 
+// probabilityAtLeast returns the percentage (0-100) of simulation results in dist
+// that met or exceeded n. Returns 0 for an empty distribution.
+func probabilityAtLeast(dist []int, n int) float64 {
+	if len(dist) == 0 {
+		return 0
+	}
+	count := 0
+	for _, v := range dist {
+		if v >= n {
+			count++
+		}
+	}
+	return float64(count) / float64(len(dist)) * 100.0
+}
+
 // --- Main ---
 
 func usage() {
@@ -746,23 +761,13 @@ func cmdProbability(args []string) error {
 		modeDescription = fmt.Sprintf("%d engineers", *engineers)
 	}
 
-	probFor := func(n int) float64 {
-		count := 0
-		for _, v := range dist {
-			if v >= n {
-				count++
-			}
-		}
-		return float64(count) / float64(*simulations) * 100.0
-	}
-
 	if *items >= 0 {
 		fmt.Printf("%s, %d days, %d items -> probability of completion?\n", modeDescription, *days, *items)
-		fmt.Printf("  %.1f%%\n", probFor(*items))
+		fmt.Printf("  %.1f%%\n", probabilityAtLeast(dist, *items))
 	} else {
 		fmt.Printf("%s, %d days -> probability of completing N items\n", modeDescription, *days)
 		for n := 1; ; n++ {
-			p := probFor(n)
+			p := probabilityAtLeast(dist, n)
 			fmt.Printf("  %d items: %.1f%%\n", n, p)
 			if p == 0 {
 				break
