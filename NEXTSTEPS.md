@@ -1,4 +1,8 @@
 # Next Steps
+- Have the simulation logic count issues for you.
+  - You might be working on Project A, but do you have 3 non-project tickets open right now, too?  Those must be considered in Project A's projection.
+  - The Linear web interface isn't totally clear on how many issues are left (are sub-issues shown? is it grouped in some way?)
+  - So we should be able to get a count as "19 in Project A + 3 No Project".
 - CFD
 
 ## Simulation Report
