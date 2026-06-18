@@ -166,3 +166,49 @@ func TestPercentile(t *testing.T) {
 		t.Errorf("Percentile(empty) = %d, want 0", got)
 	}
 }
+
+// assertAll fails unless every element of got equals want. Used with constant
+// sample pools, where each simulation trial is fully determined and must be identical.
+func assertAll(t *testing.T, got []int, want int) {
+	t.Helper()
+	if len(got) == 0 {
+		t.Fatalf("got empty result slice, want %d non-empty", want)
+	}
+	for i, v := range got {
+		if v != want {
+			t.Fatalf("result[%d] = %d, want every element == %d", i, v, want)
+		}
+	}
+}
+
+func TestSimulateItemsInDays_ConstantPool(t *testing.T) {
+	got := SimulateItemsInDays([]int{2}, 3, 10, 1000, 4, 42)
+	assertAll(t, got, 60) // 3 engineers * 10 days * 2 per draw
+}
+
+func TestSimulateDaysToComplete_ConstantPool(t *testing.T) {
+	got := SimulateDaysToComplete([]int{2}, 1, 10, 1000, 4, 42)
+	assertAll(t, got, 5) // 2 items/day, need 10 -> 5 days
+
+	// Inexact case guards the termination off-by-one: ceil(11/2) = 6.
+	got = SimulateDaysToComplete([]int{2}, 1, 11, 1000, 4, 42)
+	assertAll(t, got, 6)
+}
+
+func TestSimulateItemsInDaysPerEngineer_ConstantPool(t *testing.T) {
+	pool := &SamplePool{PerEngineer: map[string][]int{
+		"alice": {2},
+		"bob":   {3},
+	}}
+	got := SimulateItemsInDaysPerEngineer(pool, []string{"alice", "bob"}, 10, 1000, 4, 42)
+	assertAll(t, got, 50) // (2+3) per day * 10 days
+}
+
+func TestSimulateDaysToCompletePerEngineer_ConstantPool(t *testing.T) {
+	pool := &SamplePool{PerEngineer: map[string][]int{
+		"alice": {2},
+		"bob":   {3},
+	}}
+	got := SimulateDaysToCompletePerEngineer(pool, []string{"alice", "bob"}, 10, 1000, 4, 42)
+	assertAll(t, got, 2) // 5/day, need 10 -> 2 days
+}
