@@ -347,9 +347,9 @@ func parseDate(s string) (time.Time, error) {
 // that whole day). Otherwise it defaults to the current moment, so that
 // today's already-completed work is included up to right now rather than
 // being dropped entirely by a midnight-of-today cutoff.
-func resolveEndDate(cmd *flag.FlagSet, sampleEnd string) (time.Time, error) {
+func resolveEndDate(cmd *flag.FlagSet, sampleEnd string, now time.Time) (time.Time, error) {
 	if !isFlagSet(cmd, "sample-end") {
-		return time.Now().UTC(), nil
+		return now, nil
 	}
 	return parseDate(sampleEnd)
 }
@@ -487,11 +487,11 @@ func defaultDateRange() (start, end string) {
 
 // resolveSeed returns randomSeed if -random-seed was explicitly set, otherwise
 // a time-based seed so runs are non-deterministic by default.
-func resolveSeed(cmd *flag.FlagSet, randomSeed int64) int64 {
+func resolveSeed(cmd *flag.FlagSet, randomSeed int64, now time.Time) int64 {
 	if isFlagSet(cmd, "random-seed") {
 		return randomSeed
 	}
-	return time.Now().UnixNano()
+	return now.UnixNano()
 }
 
 // cmdItems
@@ -531,7 +531,8 @@ func cmdItems(args []string) error {
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start date: %w", err)
 	}
-	endDate, err := resolveEndDate(cmd, *sampleEnd)
+	now := time.Now().UTC()
+	endDate, err := resolveEndDate(cmd, *sampleEnd, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}
@@ -540,7 +541,7 @@ func cmdItems(args []string) error {
 	if err != nil {
 		return err
 	}
-	seed := resolveSeed(cmd, *randomSeed)
+	seed := resolveSeed(cmd, *randomSeed, now)
 
 	var dist []int
 	if len(team) > 0 {
@@ -608,7 +609,8 @@ func cmdDays(args []string) error {
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start date: %w", err)
 	}
-	endDate, err := resolveEndDate(cmd, *sampleEnd)
+	now := time.Now().UTC()
+	endDate, err := resolveEndDate(cmd, *sampleEnd, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}
@@ -617,7 +619,7 @@ func cmdDays(args []string) error {
 	if err != nil {
 		return err
 	}
-	seed := resolveSeed(cmd, *randomSeed)
+	seed := resolveSeed(cmd, *randomSeed, now)
 
 	var dist []int
 	if len(team) > 0 {
@@ -684,7 +686,8 @@ func cmdProbability(args []string) error {
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start date: %w", err)
 	}
-	endDate, err := resolveEndDate(cmd, *sampleEnd)
+	now := time.Now().UTC()
+	endDate, err := resolveEndDate(cmd, *sampleEnd, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}
@@ -693,7 +696,7 @@ func cmdProbability(args []string) error {
 	if err != nil {
 		return err
 	}
-	seed := resolveSeed(cmd, *randomSeed)
+	seed := resolveSeed(cmd, *randomSeed, now)
 
 	var dist []int
 	var modeDescription string
