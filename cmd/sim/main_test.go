@@ -212,3 +212,25 @@ func TestSimulateDaysToCompletePerEngineer_ConstantPool(t *testing.T) {
 	got := SimulateDaysToCompletePerEngineer(pool, []string{"alice", "bob"}, 10, 1000, 4, 42)
 	assertAll(t, got, 2) // 5/day, need 10 -> 2 days
 }
+
+func TestProbabilityAtLeast(t *testing.T) {
+	dist := []int{1, 2, 3, 4}
+	cases := []struct {
+		n    int
+		want float64
+	}{
+		{1, 100.0}, // all 4 are >= 1
+		{3, 50.0},  // 3 and 4 -> 2/4
+		{4, 25.0},  // only 4 -> 1/4
+		{5, 0.0},   // none
+	}
+	for _, c := range cases {
+		got := probabilityAtLeast(dist, c.n)
+		if diff := got - c.want; diff > 1e-9 || diff < -1e-9 {
+			t.Errorf("probabilityAtLeast(dist, %d) = %v, want %v", c.n, got, c.want)
+		}
+	}
+	if got := probabilityAtLeast(nil, 1); got != 0 {
+		t.Errorf("probabilityAtLeast(empty) = %v, want 0", got)
+	}
+}
