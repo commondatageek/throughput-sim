@@ -327,6 +327,94 @@ func probabilityAtLeast(dist []int, n int) float64 {
 	return float64(count) / float64(len(dist)) * 100.0
 }
 
+// --- Mode selection ---
+
+// samplingMode is which of the three mutually-exclusive sampling strategies a
+// command runs under: pooled anonymous engineers, the summed whole team, or a
+// set of individually-modeled named engineers.
+type samplingMode int
+
+const (
+	modeAnonymous samplingMode = iota
+	modeFullTeam
+	modeNamedTeam
+)
+
+// resolveMode enforces that -engineers, -whole-team, and -team are mutually
+// exclusive and reports the selected mode. engineersSet must report whether
+// -engineers was explicitly passed (its default value is otherwise
+// indistinguishable from an unset flag). It is pure, so the branching the three
+// commands share lives in one table-testable place.
+func resolveMode(engineersSet, wholeTeam bool, team []string) (samplingMode, error) {
+	if wholeTeam && engineersSet {
+		return 0, fmt.Errorf("-whole-team and -engineers are mutually exclusive")
+	}
+	if wholeTeam && len(team) > 0 {
+		return 0, fmt.Errorf("-whole-team and -team are mutually exclusive")
+	}
+	if engineersSet && len(team) > 0 {
+		return 0, fmt.Errorf("-engineers and -team are mutually exclusive")
+	}
+	switch {
+	case len(team) > 0:
+		return modeNamedTeam, nil
+	case wholeTeam:
+		return modeFullTeam, nil
+	default:
+		return modeAnonymous, nil
+	}
+}
+
+// modeLabel returns the noun phrase each command uses to describe the run,
+// e.g. "Team [alice, bob]", "whole-team throughput", or "3 equivalent engineers".
+func modeLabel(mode samplingMode, team []string, engineers int) string {
+	switch mode {
+	case modeNamedTeam:
+		return fmt.Sprintf("Team [%s]", strings.Join(team, ", "))
+	case modeFullTeam:
+		return "whole-team throughput"
+	default:
+		return fmt.Sprintf("%d equivalent engineers", engineers)
+	}
+}
+
+// validateTeamInPool ensures every named engineer has samples in the pool.
+// Only meaningful in modeNamedTeam; the other modes don't name engineers.
+func validateTeamInPool(pool *SamplePool, team []string) error {
+	for _, name := range team {
+		if _, ok := pool.PerEngineer[name]; !ok {
+			return fmt.Errorf("engineer %q not found in data", name)
+		}
+	}
+	return nil
+}
+
+// simulateItemsInDays answers "how many items in `days` days?" for the given
+// mode, dispatching to the right Simulate* engine.
+func simulateItemsInDays(pool *SamplePool, mode samplingMode, team []string, engineers, days, numSimulations, numWorkers int, seed int64) []int {
+	switch mode {
+	case modeNamedTeam:
+		return SimulateItemsInDaysPerEngineer(pool, team, days, numSimulations, numWorkers, seed)
+	case modeFullTeam:
+		return SimulateItemsInDays(pool.PerEngineer["__whole_team__"], 1, days, numSimulations, numWorkers, seed)
+	default:
+		return SimulateItemsInDays(pool.GetCombinedSamples(), engineers, days, numSimulations, numWorkers, seed)
+	}
+}
+
+// simulateDaysToComplete answers "how many days to finish `items` items?" for
+// the given mode, dispatching to the right Simulate* engine.
+func simulateDaysToComplete(pool *SamplePool, mode samplingMode, team []string, engineers, items, numSimulations, numWorkers int, seed int64) []int {
+	switch mode {
+	case modeNamedTeam:
+		return SimulateDaysToCompletePerEngineer(pool, team, items, numSimulations, numWorkers, seed)
+	case modeFullTeam:
+		return SimulateDaysToComplete(pool.PerEngineer["__whole_team__"], 1, items, numSimulations, numWorkers, seed)
+	default:
+		return SimulateDaysToComplete(pool.GetCombinedSamples(), engineers, items, numSimulations, numWorkers, seed)
+	}
+}
+
 // --- Main ---
 
 func usage() {
@@ -517,14 +605,9 @@ func cmdItems(args []string) error {
 	cmd.Var(&team, "team", "comma-separated list of specific engineer names to model individually")
 	cmd.Parse(args)
 
-	if *wholeTeam && isFlagSet(cmd, "engineers") {
-		return fmt.Errorf("-whole-team and -engineers are mutually exclusive")
-	}
-	if *wholeTeam && len(team) > 0 {
-		return fmt.Errorf("-whole-team and -team are mutually exclusive")
-	}
-	if isFlagSet(cmd, "engineers") && len(team) > 0 {
-		return fmt.Errorf("-engineers and -team are mutually exclusive")
+	mode, err := resolveMode(isFlagSet(cmd, "engineers"), *wholeTeam, team)
+	if err != nil {
+		return err
 	}
 
 	startDate, err := parseDate(*sampleStart)
@@ -541,28 +624,15 @@ func cmdItems(args []string) error {
 	if err != nil {
 		return err
 	}
+	if mode == modeNamedTeam {
+		if err := validateTeamInPool(pool, team); err != nil {
+			return err
+		}
+	}
 	seed := resolveSeed(cmd, *randomSeed, now)
 
-	var dist []int
-	if len(team) > 0 {
-		// Named engineers mode
-		for _, name := range team {
-			if _, ok := pool.PerEngineer[name]; !ok {
-				return fmt.Errorf("engineer %q not found in data", name)
-			}
-		}
-		dist = SimulateItemsInDaysPerEngineer(pool, team, *days, *simulations, *goroutines, seed)
-		fmt.Printf("Team [%s], %d days -> how many items?\n", strings.Join(team, ", "), *days)
-	} else if *wholeTeam {
-		// Whole team mode
-		dist = SimulateItemsInDays(pool.PerEngineer["__whole_team__"], 1, *days, *simulations, *goroutines, seed)
-		fmt.Printf("whole-team throughput, %d days -> how many items?\n", *days)
-	} else {
-		// Anonymous engineers mode
-		combinedSamples := pool.GetCombinedSamples()
-		dist = SimulateItemsInDays(combinedSamples, *engineers, *days, *simulations, *goroutines, seed)
-		fmt.Printf("%d engineers, %d days -> how many items?\n", *engineers, *days)
-	}
+	dist := simulateItemsInDays(pool, mode, team, *engineers, *days, *simulations, *goroutines, seed)
+	fmt.Printf("%s, %d days -> how many items?\n", modeLabel(mode, team, *engineers), *days)
 
 	if len(percentiles) == 0 {
 		percentiles = intList{5, 25, 50, 75, 95}
@@ -595,14 +665,9 @@ func cmdDays(args []string) error {
 	cmd.Var(&team, "team", "comma-separated list of specific engineer names to model individually")
 	cmd.Parse(args)
 
-	if *wholeTeam && isFlagSet(cmd, "engineers") {
-		return fmt.Errorf("-whole-team and -engineers are mutually exclusive")
-	}
-	if *wholeTeam && len(team) > 0 {
-		return fmt.Errorf("-whole-team and -team are mutually exclusive")
-	}
-	if isFlagSet(cmd, "engineers") && len(team) > 0 {
-		return fmt.Errorf("-engineers and -team are mutually exclusive")
+	mode, err := resolveMode(isFlagSet(cmd, "engineers"), *wholeTeam, team)
+	if err != nil {
+		return err
 	}
 
 	startDate, err := parseDate(*sampleStart)
@@ -619,28 +684,15 @@ func cmdDays(args []string) error {
 	if err != nil {
 		return err
 	}
+	if mode == modeNamedTeam {
+		if err := validateTeamInPool(pool, team); err != nil {
+			return err
+		}
+	}
 	seed := resolveSeed(cmd, *randomSeed, now)
 
-	var dist []int
-	if len(team) > 0 {
-		// Named engineers mode
-		for _, name := range team {
-			if _, ok := pool.PerEngineer[name]; !ok {
-				return fmt.Errorf("engineer %q not found in data", name)
-			}
-		}
-		dist = SimulateDaysToCompletePerEngineer(pool, team, *items, *simulations, *goroutines, seed)
-		fmt.Printf("Team [%s], %d items -> how many days?\n", strings.Join(team, ", "), *items)
-	} else if *wholeTeam {
-		// Whole team mode
-		dist = SimulateDaysToComplete(pool.PerEngineer["__whole_team__"], 1, *items, *simulations, *goroutines, seed)
-		fmt.Printf("whole-team throughput, %d items -> how many days?\n", *items)
-	} else {
-		// Anonymous engineers mode
-		combinedSamples := pool.GetCombinedSamples()
-		dist = SimulateDaysToComplete(combinedSamples, *engineers, *items, *simulations, *goroutines, seed)
-		fmt.Printf("%d engineers, %d items -> how many days?\n", *engineers, *items)
-	}
+	dist := simulateDaysToComplete(pool, mode, team, *engineers, *items, *simulations, *goroutines, seed)
+	fmt.Printf("%s, %d items -> how many days?\n", modeLabel(mode, team, *engineers), *items)
 
 	if len(percentiles) == 0 {
 		percentiles = intList{50, 75, 85, 95}
@@ -672,14 +724,9 @@ func cmdProbability(args []string) error {
 	cmd.Var(&team, "team", "comma-separated list of specific engineer names to model individually")
 	cmd.Parse(args)
 
-	if *wholeTeam && isFlagSet(cmd, "engineers") {
-		return fmt.Errorf("-whole-team and -engineers are mutually exclusive")
-	}
-	if *wholeTeam && len(team) > 0 {
-		return fmt.Errorf("-whole-team and -team are mutually exclusive")
-	}
-	if isFlagSet(cmd, "engineers") && len(team) > 0 {
-		return fmt.Errorf("-engineers and -team are mutually exclusive")
+	mode, err := resolveMode(isFlagSet(cmd, "engineers"), *wholeTeam, team)
+	if err != nil {
+		return err
 	}
 
 	startDate, err := parseDate(*sampleStart)
@@ -696,30 +743,15 @@ func cmdProbability(args []string) error {
 	if err != nil {
 		return err
 	}
+	if mode == modeNamedTeam {
+		if err := validateTeamInPool(pool, team); err != nil {
+			return err
+		}
+	}
 	seed := resolveSeed(cmd, *randomSeed, now)
 
-	var dist []int
-	var modeDescription string
-
-	if len(team) > 0 {
-		// Named engineers mode
-		for _, name := range team {
-			if _, ok := pool.PerEngineer[name]; !ok {
-				return fmt.Errorf("engineer %q not found in data", name)
-			}
-		}
-		dist = SimulateItemsInDaysPerEngineer(pool, team, *days, *simulations, *goroutines, seed)
-		modeDescription = fmt.Sprintf("Team [%s]", strings.Join(team, ", "))
-	} else if *wholeTeam {
-		// Whole team mode
-		dist = SimulateItemsInDays(pool.PerEngineer["__whole_team__"], 1, *days, *simulations, *goroutines, seed)
-		modeDescription = "whole-team throughput"
-	} else {
-		// Anonymous engineers mode
-		combinedSamples := pool.GetCombinedSamples()
-		dist = SimulateItemsInDays(combinedSamples, *engineers, *days, *simulations, *goroutines, seed)
-		modeDescription = fmt.Sprintf("%d engineers", *engineers)
-	}
+	dist := simulateItemsInDays(pool, mode, team, *engineers, *days, *simulations, *goroutines, seed)
+	modeDescription := modeLabel(mode, team, *engineers)
 
 	if *items >= 0 {
 		fmt.Printf("%s, %d days, %d items -> probability of completion?\n", modeDescription, *days, *items)

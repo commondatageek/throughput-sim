@@ -33,6 +33,29 @@ func TestBuildPool_PreservesZeroDays(t *testing.T) {
 	}
 }
 
+func TestBuildPool_PartialNowEndDayCountsToday(t *testing.T) {
+	// When -sample-end is omitted, resolveEndDate returns a partial "now"
+	// (mid-afternoon on 2025-01-05), so daysBetween grants today an inclusive
+	// slot at idx == totalDays-1. A completion landing on that final partial day
+	// must be counted, not silently dropped as out-of-range. This is the seam
+	// between daysBetween's +1 partial-day branch and buildPool's idx bounds
+	// check, the off-by-one a refactor of either would most easily reintroduce.
+	start := day(2025, 1, 1)
+	now := time.Date(2025, 1, 5, 14, 30, 0, 0, time.UTC) // partial last day
+	records := []completion{
+		at("alice", 2025, 1, 1), // idx 0
+		at("alice", 2025, 1, 5), // idx 4 == totalDays-1, the partial "today"
+		at("alice", 2025, 1, 6), // idx 5, past the window -> dropped
+	}
+	pool := buildPool(records, Exclusions{}, start, now, false)
+
+	got := pool.PerEngineer["alice"]
+	want := []int{1, 0, 0, 0, 1} // 5 slots; today (idx 4) counted, 1/6 dropped
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("alice samples = %v, want %v (today's work must land in the final partial slot)", got, want)
+	}
+}
+
 func TestBuildPool_DropsOutOfRangeCompletions(t *testing.T) {
 	start, end := day(2025, 1, 1), day(2025, 1, 11)
 	records := []completion{
@@ -233,6 +256,71 @@ func TestProbabilityAtLeast(t *testing.T) {
 	}
 	if got := probabilityAtLeast(nil, 1); got != 0 {
 		t.Errorf("probabilityAtLeast(empty) = %v, want 0", got)
+	}
+}
+
+func TestResolveMode(t *testing.T) {
+	cases := []struct {
+		name         string
+		engineersSet bool
+		wholeTeam    bool
+		team         []string
+		want         samplingMode
+		wantErr      bool
+	}{
+		{"default is anonymous", false, false, nil, modeAnonymous, false},
+		{"engineers set stays anonymous", true, false, nil, modeAnonymous, false},
+		{"whole-team", false, true, nil, modeFullTeam, false},
+		{"named team", false, false, []string{"alice"}, modeNamedTeam, false},
+		{"team wins when only team set", false, false, []string{"alice", "bob"}, modeNamedTeam, false},
+		{"whole-team + engineers conflict", true, true, nil, 0, true},
+		{"whole-team + team conflict", false, true, []string{"alice"}, 0, true},
+		{"engineers + team conflict", true, false, []string{"alice"}, 0, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := resolveMode(c.engineersSet, c.wholeTeam, c.team)
+			if c.wantErr {
+				if err == nil {
+					t.Fatalf("resolveMode(%v, %v, %v) = %v, want error", c.engineersSet, c.wholeTeam, c.team, got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("resolveMode error: %v", err)
+			}
+			if got != c.want {
+				t.Errorf("resolveMode = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
+
+func TestModeLabel(t *testing.T) {
+	cases := []struct {
+		mode      samplingMode
+		team      []string
+		engineers int
+		want      string
+	}{
+		{modeNamedTeam, []string{"alice", "bob"}, 3, "Team [alice, bob]"},
+		{modeFullTeam, nil, 3, "whole-team throughput"},
+		{modeAnonymous, nil, 3, "3 equivalent engineers"},
+	}
+	for _, c := range cases {
+		if got := modeLabel(c.mode, c.team, c.engineers); got != c.want {
+			t.Errorf("modeLabel(%v) = %q, want %q", c.mode, got, c.want)
+		}
+	}
+}
+
+func TestValidateTeamInPool(t *testing.T) {
+	pool := &SamplePool{PerEngineer: map[string][]int{"alice": {1}, "bob": {2}}}
+	if err := validateTeamInPool(pool, []string{"alice", "bob"}); err != nil {
+		t.Errorf("validateTeamInPool(known names) = %v, want nil", err)
+	}
+	if err := validateTeamInPool(pool, []string{"alice", "carol"}); err == nil {
+		t.Error("validateTeamInPool(unknown name) = nil, want error")
 	}
 }
 
