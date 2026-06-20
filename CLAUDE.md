@@ -34,7 +34,7 @@ linear.Client  --Fetch-->  linear.Issue  --Upsert-->  sqlite.Store (linear.db, "
                               (Monte Carlo forecasts)                    (cycle-time / WIP-age report)
 ```
 
-**`internal/linear`** — Defines `Issue` (the record: identifier, title, assignee, team, project, project milestone, workflow state, timestamps) and `Client`, which fetches from the Linear.app GraphQL API (`Client.Fetch`, paginated, filters to `completed`/`started` issues with a non-null assignee). `KeyList` is a `flag.Value` for comma-separated, upper-cased team keys. In-progress issues without a `startedAt` are dropped (can't be used for aging). `toIssue` maps the GraphQL `issueNode` onto `Issue`, using Linear's own field names (`state.type` → `StateType`, `projectMilestone.id/name` → `ProjectMilestoneID/Name`).
+**`internal/linear`** — Defines `Issue` (the record: identifier, title, assignee, team, project, project milestone, workflow state, timestamps) and `Client`, which fetches from the Linear.app GraphQL API (`Client.Fetch`, paginated, filters to `completed`/`started` issues with a non-null assignee). `KeyList` is a `flag.Value` for comma-separated, upper-cased team keys. In-progress issues without a `startedAt` are dropped (can't be used for aging). `toIssue` maps the GraphQL `issueNode` onto `Issue`, using Linear's own field names (`state.type` → `StateType`, `state.name` → `StateName`, `projectMilestone.id/name` → `ProjectMilestoneID/Name`).
 
 **`internal/sqlite`** — The only place SQL lives. `Store` wraps a `database/sql` SQLite connection (via `modernc.org/sqlite`, pure Go, no cgo) with WAL mode and goose migrations embedded from `migrations/*.sql`. Key methods: `Upsert` (keyed on `identifier`), `LatestUpdatedAt` (watermark for incremental sync), `CompletedBetween` (date-ranged, optionally assignee-filtered), `InProgress`.
 
@@ -53,7 +53,7 @@ linear.Client  --Fetch-->  linear.Issue  --Upsert-->  sqlite.Store (linear.db, "
 
 ### Data formats
 
-**`linear.db`** (SQLite, the only data store) — single `issues` table, primary key `identifier`. Schema in `internal/sqlite/migrations/00001_create_issues.sql`. Columns are faithful transliterations of Linear's own field names (e.g. `state_type` from `state.type`, `project_milestone_id`/`project_milestone_name` from `projectMilestone`).
+**`linear.db`** (SQLite, the only data store) — single `issues` table, primary key `identifier`. Schema in `internal/sqlite/migrations/00001_create_issues.sql`. Columns are faithful transliterations of Linear's own field names (e.g. `state_type`/`state_name` from `state.type`/`state.name`, `project_milestone_id`/`project_milestone_name` from `projectMilestone`).
 
 **`exclusions.json`** (optional input to `sim`, e.g. for holidays):
 ```json

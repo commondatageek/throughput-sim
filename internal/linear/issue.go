@@ -13,6 +13,7 @@ type Issue struct {
 	ProjectMilestoneID   string
 	ProjectMilestoneName string
 	StateType            string // raw workflow state type, e.g. Linear's state.type
+	StateName            string // human-readable workflow state name, e.g. Linear's state.name
 	CreatedAt            time.Time
 	StartedAt            time.Time
 	CompletedAt          time.Time

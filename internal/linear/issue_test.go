@@ -46,7 +46,7 @@ func TestToIssueFullyPopulated(t *testing.T) {
 		Team:             &teamRef{Name: "ENG"},
 		Project:          &projectRef{ID: "proj-1", Name: "Q3"},
 		ProjectMilestone: &milestoneRef{ID: "ms-1", Name: "Milestone 1"},
-		State:            &stateRef{Type: "completed"},
+		State:            &stateRef{Type: "completed", Name: "Done"},
 	}
 
 	got, ok := toIssue(n)
@@ -64,6 +64,7 @@ func TestToIssueFullyPopulated(t *testing.T) {
 		ProjectMilestoneID:   "ms-1",
 		ProjectMilestoneName: "Milestone 1",
 		StateType:            "completed",
+		StateName:            "Done",
 		CreatedAt:            createdAt,
 		StartedAt:            startedAt,
 		CompletedAt:          completedAt,
@@ -90,7 +91,8 @@ func TestToIssueNilRelationsYieldEmptyStrings(t *testing.T) {
 		t.Fatalf("toIssue should not skip a completed issue with nil relations")
 	}
 	if got.Team != "" || got.ProjectID != "" || got.ProjectName != "" ||
-		got.ProjectMilestoneID != "" || got.ProjectMilestoneName != "" || got.StateType != "" {
+		got.ProjectMilestoneID != "" || got.ProjectMilestoneName != "" ||
+		got.StateType != "" || got.StateName != "" {
 		t.Fatalf("toIssue() with nil relations = %+v, want all relation fields empty", got)
 	}
 }

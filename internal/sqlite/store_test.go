@@ -139,6 +139,7 @@ func TestInProgress(t *testing.T) {
 	earlier := linear.Issue{
 		Identifier: "ENG-2",
 		StateType:  "started",
+		StateName:  "In Review",
 		StartedAt:  mustParse(t, "2024-01-01T00:00:00Z"),
 	}
 	later := linear.Issue{
@@ -159,6 +160,9 @@ func TestInProgress(t *testing.T) {
 	}
 	if got[0].Identifier != "ENG-2" || got[1].Identifier != "ENG-3" {
 		t.Fatalf("InProgress order = [%s, %s], want [ENG-2, ENG-3] (started_at ASC)", got[0].Identifier, got[1].Identifier)
+	}
+	if got[0].StateName != "In Review" {
+		t.Fatalf("InProgress StateName = %q, want %q", got[0].StateName, "In Review")
 	}
 }
 

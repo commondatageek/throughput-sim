@@ -189,8 +189,10 @@ func toIssue(n issueNode) (Issue, bool) {
 		milestoneName = n.ProjectMilestone.Name
 	}
 	stateType := ""
+	stateName := ""
 	if n.State != nil {
 		stateType = n.State.Type
+		stateName = n.State.Name
 	}
 
 	return Issue{
@@ -203,6 +205,7 @@ func toIssue(n issueNode) (Issue, bool) {
 		ProjectMilestoneID:   milestoneID,
 		ProjectMilestoneName: milestoneName,
 		StateType:            stateType,
+		StateName:            stateName,
 		CreatedAt:            n.CreatedAt,
 		StartedAt:            n.StartedAt,
 		CompletedAt:          n.CompletedAt,
@@ -270,6 +273,7 @@ query FetchIssues($after: String) {
       }
       state {
         type
+        name
       }
     }
     pageInfo {
@@ -330,6 +334,7 @@ type milestoneRef struct {
 
 type stateRef struct {
 	Type string `json:"type"`
+	Name string `json:"name"`
 }
 
 type issuesConnection struct {

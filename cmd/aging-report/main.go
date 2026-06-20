@@ -22,6 +22,8 @@ type reportItem struct {
 	Title       string
 	Assignee    string
 	ProjectName string
+	StateType   string
+	StateName   string
 	StartedAt   time.Time
 	AgeDays     float64
 	Percentile  int
@@ -109,6 +111,20 @@ func formatStartDate(t time.Time) string {
 	return t.Local().Format("Mon 1/2")
 }
 
+// formatState renders the workflow state for display, pairing Linear's
+// human-readable state name with its underlying type, e.g. "In Review (started)".
+// Falls back gracefully when either piece is missing.
+func formatState(name, typ string) string {
+	switch {
+	case name != "" && typ != "":
+		return fmt.Sprintf("%s (%s)", name, typ)
+	case name != "":
+		return name
+	default:
+		return typ
+	}
+}
+
 // loadFromDB reads cycle times and in-progress items from the SQLite store.
 func loadFromDB(dbPath string, sampleStart, sampleEnd time.Time, minCycleTime time.Duration, today time.Time) (cycleTimes []float64, inProgress []reportItem, err error) {
 	store, err := sqlite.Open(dbPath)
@@ -149,6 +165,8 @@ func loadFromDB(dbPath string, sampleStart, sampleEnd time.Time, minCycleTime ti
 			Title:       it.Title,
 			Assignee:    it.Assignee,
 			ProjectName: it.ProjectName,
+			StateType:   it.StateType,
+			StateName:   it.StateName,
 			StartedAt:   it.StartedAt,
 			AgeDays:     ageDays,
 		})
@@ -246,14 +264,15 @@ func outputText(items []reportItem, cycleTimes []float64, p85 float64, sampleSta
 	)
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "IDENTIFIER\tTITLE\tDAYS\tPERCENTILE\tSTART DATE\tASSIGNEE")
+	fmt.Fprintln(w, "IDENTIFIER\tTITLE\tDAYS\tPERCENTILE\tSTATE\tSTART DATE\tASSIGNEE")
 	for _, item := range items {
 		pct := item.Percentile
-		fmt.Fprintf(w, "%s\t%s\t%.1f\t%d%s\t%s\t%s\n",
+		fmt.Fprintf(w, "%s\t%s\t%.1f\t%d%s\t%s\t%s\t%s\n",
 			item.Identifier,
 			item.Title,
 			item.AgeDays,
 			pct, ordinalSuffix(pct),
+			formatState(item.StateName, item.StateType),
 			formatStartDate(item.StartedAt),
 			item.Assignee,
 		)
@@ -266,6 +285,8 @@ type jsonItem struct {
 	Title       string  `json:"title"`
 	Assignee    string  `json:"assignee"`
 	ProjectName string  `json:"project_name,omitempty"`
+	StateType   string  `json:"state_type,omitempty"`
+	StateName   string  `json:"state_name,omitempty"`
 	StartedAt   string  `json:"started_at"`
 	AgeDays     float64 `json:"age_days"`
 	Percentile  int     `json:"percentile"`
@@ -279,6 +300,8 @@ func outputJSON(items []reportItem) {
 			Title:       item.Title,
 			Assignee:    item.Assignee,
 			ProjectName: item.ProjectName,
+			StateType:   item.StateType,
+			StateName:   item.StateName,
 			StartedAt:   item.StartedAt.Format("2006-01-02"),
 			AgeDays:     math.Round(item.AgeDays*10) / 10,
 			Percentile:  item.Percentile,
@@ -328,6 +351,7 @@ const htmlTmpl = `<!DOCTYPE html>
       <th>Title</th>
       <th>Days</th>
       <th>Percentile</th>
+      <th>State</th>
       <th>Start Date</th>
       <th>Assignee</th>
     </tr>
@@ -339,6 +363,7 @@ const htmlTmpl = `<!DOCTYPE html>
       <td>{{.Title}}</td>
       <td class="num {{.AgeClass}}">{{printf "%.1f" .AgeDays}}</td>
       <td class="num {{.AgeClass}}">{{.Percentile}}{{.Suffix}}</td>
+      <td>{{.State}}</td>
       <td>{{.StartDate}}</td>
       <td>{{.Assignee}}</td>
     </tr>
@@ -355,6 +380,7 @@ type htmlItem struct {
 	Percentile int
 	Suffix     string
 	AgeClass   string
+	State      string
 	StartDate  string
 	Assignee   string
 }
@@ -396,6 +422,7 @@ func outputHTML(items []reportItem, p85 float64, sampleStart, sampleEnd time.Tim
 			Percentile: item.Percentile,
 			Suffix:     ordinalSuffix(item.Percentile),
 			AgeClass:   ageClass(item.Percentile),
+			State:      formatState(item.StateName, item.StateType),
 			StartDate:  formatStartDate(item.StartedAt),
 			Assignee:   item.Assignee,
 		})

@@ -59,11 +59,11 @@ func (s *Store) Upsert(ctx context.Context, issues ...linear.Issue) error {
 	const q = `
 INSERT INTO issues
     (identifier, title, assignee, team, project_id, project_name,
-     project_milestone_id, project_milestone_name, state_type,
+     project_milestone_id, project_milestone_name, state_type, state_name,
      created_at, started_at, completed_at, archived_at, auto_archived_at,
      added_to_project_at, updated_at)
 VALUES
-    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(identifier) DO UPDATE SET
     title                  = excluded.title,
     assignee               = excluded.assignee,
@@ -73,6 +73,7 @@ ON CONFLICT(identifier) DO UPDATE SET
     project_milestone_id   = excluded.project_milestone_id,
     project_milestone_name = excluded.project_milestone_name,
     state_type             = excluded.state_type,
+    state_name             = excluded.state_name,
     created_at             = excluded.created_at,
     started_at             = excluded.started_at,
     completed_at           = excluded.completed_at,
@@ -104,6 +105,7 @@ ON CONFLICT(identifier) DO UPDATE SET
 			it.ProjectMilestoneID,
 			it.ProjectMilestoneName,
 			it.StateType,
+			it.StateName,
 			nullTime(it.CreatedAt),
 			nullTime(it.StartedAt),
 			nullTime(it.CompletedAt),
@@ -206,7 +208,7 @@ WHERE state_type = 'completed'
 // non-NULL started_at. Results are ordered by started_at ascending.
 func (s *Store) InProgress(ctx context.Context) ([]linear.Issue, error) {
 	const q = `
-SELECT identifier, title, assignee, team, project_name, state_type, started_at
+SELECT identifier, title, assignee, team, project_name, state_type, state_name, started_at
 FROM issues
 WHERE state_type = 'started'
   AND started_at IS NOT NULL
@@ -224,7 +226,7 @@ ORDER BY started_at ASC`
 		var startedAt sql.NullTime
 		if err := rows.Scan(
 			&it.Identifier, &it.Title, &it.Assignee,
-			&it.Team, &it.ProjectName, &it.StateType, &startedAt,
+			&it.Team, &it.ProjectName, &it.StateType, &it.StateName, &startedAt,
 		); err != nil {
 			return nil, fmt.Errorf("InProgress scan: %w", err)
 		}

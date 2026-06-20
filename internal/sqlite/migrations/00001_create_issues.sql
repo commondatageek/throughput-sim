@@ -9,6 +9,7 @@ CREATE TABLE issues (
     project_milestone_id    TEXT NOT NULL DEFAULT '',
     project_milestone_name  TEXT NOT NULL DEFAULT '',
     state_type              TEXT NOT NULL DEFAULT '',
+    state_name              TEXT NOT NULL DEFAULT '',
     created_at              DATETIME,
     started_at              DATETIME,
     completed_at            DATETIME,
