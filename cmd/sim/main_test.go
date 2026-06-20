@@ -5,7 +5,47 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"forecasting/internal/linear"
 )
+
+func TestValidCompletions_SkipsMalformed(t *testing.T) {
+	completedAt := day(2025, 1, 5)
+	issues := []linear.Issue{
+		{Identifier: "ENG-1", Assignee: "alice", CompletedAt: completedAt},
+		{Identifier: "ENG-2", Assignee: "", CompletedAt: completedAt},    // no assignee
+		{Identifier: "ENG-3", Assignee: "bob", CompletedAt: time.Time{}}, // no completion instant
+		{Identifier: "ENG-4", Assignee: "", CompletedAt: time.Time{}},    // both missing
+		{Identifier: "ENG-5", Assignee: "carol", CompletedAt: completedAt},
+	}
+
+	records, skipped := validCompletions(issues)
+
+	if skipped != 3 {
+		t.Fatalf("skipped = %d, want 3", skipped)
+	}
+	want := []completion{
+		{Engineer: "alice", CompletedAt: completedAt},
+		{Engineer: "carol", CompletedAt: completedAt},
+	}
+	if !reflect.DeepEqual(records, want) {
+		t.Fatalf("records = %+v, want %+v", records, want)
+	}
+}
+
+func TestValidCompletions_AllValid(t *testing.T) {
+	issues := []linear.Issue{
+		{Identifier: "ENG-1", Assignee: "alice", CompletedAt: day(2025, 1, 5)},
+		{Identifier: "ENG-2", Assignee: "bob", CompletedAt: day(2025, 1, 6)},
+	}
+	records, skipped := validCompletions(issues)
+	if skipped != 0 {
+		t.Fatalf("skipped = %d, want 0", skipped)
+	}
+	if len(records) != 2 {
+		t.Fatalf("len(records) = %d, want 2", len(records))
+	}
+}
 
 func day(y int, m time.Month, d int) time.Time {
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)

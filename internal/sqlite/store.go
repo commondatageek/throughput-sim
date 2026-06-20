@@ -147,7 +147,15 @@ func (s *Store) LatestUpdatedAt(ctx context.Context) (time.Time, error) {
 // CompletedBetween returns completed issues whose completed_at falls within
 // [start, end) — start inclusive, end exclusive. If assignees is non-empty,
 // only issues whose assignee is in that set are returned. Unassigned issues
-// (NULL assignee) are always excluded — throughput is attributed per engineer.
+// (NULL or empty assignee) are always excluded — throughput is attributed per
+// engineer.
+//
+// The store now holds every issue (all states, assigned or not), so the
+// state_type and assignee predicates here are load-bearing: they are the single
+// chokepoint that keeps unstarted/canceled/unassigned issues out of the
+// forecast. The `assignee <> ''` clause guards against an empty-string assignee
+// slipping through `assignee IS NOT NULL`; today the writer normalizes "" to
+// NULL (see nullString), but the reader shouldn't depend on that invariant.
 //
 // Returned issues have Identifier, Title, Assignee, Team, ProjectName,
 // StateType, StartedAt, CompletedAt, and UpdatedAt populated.
@@ -158,6 +166,7 @@ SELECT identifier, title, assignee, team, project_name, state_type,
 FROM issues
 WHERE state_type = 'completed'
   AND assignee IS NOT NULL
+  AND assignee <> ''
   AND completed_at >= ?
   AND completed_at < ?`
 

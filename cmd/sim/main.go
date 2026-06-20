@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"forecasting/internal/linear"
 	"forecasting/internal/sqlite"
 
 	"github.com/mattn/go-isatty"
@@ -518,12 +519,33 @@ func loadPool(dbPath, exclusionsFile string, includeEngineers []string, startDat
 		return nil, err
 	}
 
-	records := make([]completion, len(issues))
-	for i, it := range issues {
-		records[i] = completion{Engineer: it.Assignee, CompletedAt: it.CompletedAt}
+	records, skipped := validCompletions(issues)
+	if skipped > 0 {
+		fmt.Fprintf(os.Stderr, "WARNING: skipped %d completed issue(s) with no assignee or completion date\n", skipped)
 	}
 
 	return buildPool(records, exc, startDate, endDate, wholeTeam), nil
+}
+
+// validCompletions reduces store rows to completion records, dropping any with
+// no assignee or no completion instant and reporting how many were skipped.
+//
+// CompletedBetween already filters to completed, assigned issues, so in normal
+// operation nothing is skipped. This is belt-and-suspenders: now that the store
+// holds every issue, a future change to that query (or a new loader) could let
+// an unassigned or never-completed issue through, and binning it as a "0
+// completions" engineer-day would silently bias the forecast. Skipping it and
+// returning a count lets the caller warn loudly instead.
+func validCompletions(issues []linear.Issue) (records []completion, skipped int) {
+	records = make([]completion, 0, len(issues))
+	for _, it := range issues {
+		if it.Assignee == "" || it.CompletedAt.IsZero() {
+			skipped++
+			continue
+		}
+		records = append(records, completion{Engineer: it.Assignee, CompletedAt: it.CompletedAt})
+	}
+	return records, skipped
 }
 
 // warnUnmatchedIncludes logs a warning for any name in includeEngineers that

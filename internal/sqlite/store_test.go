@@ -93,6 +93,32 @@ func TestCompletedBetweenExcludesUnassigned(t *testing.T) {
 	}
 }
 
+func TestCompletedBetweenExcludesEmptyAssignee(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+
+	// Upsert normalizes "" to NULL via nullString, so to exercise the
+	// `assignee <> ''` guard we have to write an empty-string assignee directly,
+	// simulating a row that bypassed that normalization.
+	if _, err := store.db.ExecContext(ctx,
+		`INSERT INTO issues (identifier, assignee, state_type, completed_at)
+		 VALUES ('ENG-EMPTY', '', 'completed', ?)`,
+		mustParse(t, "2024-01-05T00:00:00Z"),
+	); err != nil {
+		t.Fatalf("insert: %v", err)
+	}
+
+	start := mustParse(t, "2024-01-01T00:00:00Z")
+	end := mustParse(t, "2024-01-10T00:00:00Z")
+	got, err := store.CompletedBetween(ctx, start, end, nil)
+	if err != nil {
+		t.Fatalf("CompletedBetween: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("CompletedBetween = %+v, want none (empty-string assignee excluded)", got)
+	}
+}
+
 func TestCompletedBetweenBoundary(t *testing.T) {
 	store := openTestStore(t)
 	ctx := context.Background()
