@@ -40,7 +40,7 @@ linear.Client  --Fetch-->  linear.Issue  --Upsert-->  sqlite.Store (linear.db, "
 
 ### Commands (`cmd/`)
 
-- **`sync`** — Production path. Database-centric: `bin/sync <db-path>` takes the db file as a required positional argument and syncs **one team at a time**, each against its own `team_key` watermark, committing before moving to the next. With no `-teams`/`-all-teams`, it incrementally syncs every team already in the db. `-teams k1,k2` limits/extends the candidate set (new keys get a full sync); `-all-teams` expands the candidate set to every accessible Linear team (via `Client.ListTeams`); `-full-reload` ignores the watermark and full-syncs every candidate team. A brand-new/empty db requires `-teams` or `-all-teams` to seed it. Progress is logged via `log/slog`.
+- **`sync`** — Production path. Database-centric: `bin/sync [-teams k1,k2] [-all-teams] [-full-reload] <db-path>` takes the db file as a required positional argument *after* any flags (standard `flag` package ordering — flags must precede `flag.Arg(0)`) and syncs **one team at a time**, each against its own `team_key` watermark, committing before moving to the next. With no `-teams`/`-all-teams`, it incrementally syncs every team already in the db. `-teams k1,k2` limits/extends the candidate set (new keys get a full sync); `-all-teams` expands the candidate set to every accessible Linear team (via `Client.ListTeams`); `-full-reload` ignores the watermark and full-syncs every candidate team. A brand-new/empty db requires `-teams` or `-all-teams` to seed it. Progress is logged via `log/slog`.
 - **`list-teams`** — Lists accessible Linear teams (key, name) and exits.
 - **`sim`** — The Monte Carlo engine. Three subcommands:
   - `items` — how many items can N engineers complete in D days?
