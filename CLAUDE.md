@@ -40,7 +40,7 @@ linear.Client  --Fetch-->  linear.Issue  --Upsert-->  sqlite.Store (linear.db, "
 
 ### Commands (`cmd/`)
 
-- **`sync`** — Production path. Fetches from Linear and upserts into `linear.db`. `-sync-all` forces a full reload ignoring the watermark; `-all-teams` vs `-teams` selects scope; `-list-teams` lists accessible teams and exits.
+- **`sync`** — Production path. Fetches from Linear and upserts into `linear.db`. `-full-reload` forces a full reload ignoring the watermark; `-all-teams` vs `-teams` selects scope; `-list-teams` lists accessible teams and exits.
 - **`sim`** — The Monte Carlo engine. Three subcommands:
   - `items` — how many items can N engineers complete in D days?
   - `days` — how many days for N engineers to complete I items?

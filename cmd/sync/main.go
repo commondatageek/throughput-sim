@@ -16,7 +16,7 @@ func main() {
 	var teams linear.KeyList
 	flag.Var(&teams, "teams", "comma-separated team keys, e.g. ENG,DESIGN; required unless -all-teams")
 	allTeams := flag.Bool("all-teams", false, "fetch issues for all accessible teams; mutually exclusive with -teams")
-	syncAll := flag.Bool("sync-all", false, "ignore the stored watermark and do a full reload from Linear")
+	fullReload := flag.Bool("full-reload", false, "ignore the stored watermark and do a full reload from Linear")
 	db := flag.String("db", "linear.db", "path to SQLite database file")
 
 	flag.Parse()
@@ -37,13 +37,13 @@ func main() {
 	// stderr
 	stderr := os.Stderr
 
-	if err := run(ctx, client, teams, *allTeams, *syncAll, *db); err != nil {
+	if err := run(ctx, client, teams, *allTeams, *fullReload, *db); err != nil {
 		fmt.Fprintf(stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run(ctx context.Context, client *linear.Client, teams linear.KeyList, allTeams, syncAll bool, dbPath string) error {
+func run(ctx context.Context, client *linear.Client, teams linear.KeyList, allTeams, fullReload bool, dbPath string) error {
 	if allTeams && len(teams) > 0 {
 		return fmt.Errorf("-teams and -all-teams are mutually exclusive")
 	}
@@ -64,7 +64,7 @@ func run(ctx context.Context, client *linear.Client, teams linear.KeyList, allTe
 	defer store.Close()
 
 	var since time.Time
-	if !syncAll {
+	if !fullReload {
 		since, err = store.LatestUpdatedAt(ctx)
 		if err != nil {
 			return fmt.Errorf("watermark: %w", err)
