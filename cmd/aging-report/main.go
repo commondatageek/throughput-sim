@@ -22,20 +22,20 @@ type issue struct {
 	Team        string `json:"team"`
 	Identifier  string `json:"identifier"`
 	Title       string `json:"title"`
-	Project     string `json:"project"`
+	ProjectName string `json:"project_name"`
 	StartedAt   string `json:"started_at"`
 	CompletedAt string `json:"completed_at"`
 	Status      string `json:"status"`
 }
 
 type reportItem struct {
-	Identifier string
-	Title      string
-	Assignee   string
-	Project    string
-	StartedAt  time.Time
-	AgeDays    float64
-	Percentile int
+	Identifier  string
+	Title       string
+	Assignee    string
+	ProjectName string
+	StartedAt   time.Time
+	AgeDays     float64
+	Percentile  int
 }
 
 func parseDate(s string) (time.Time, error) {
@@ -156,12 +156,12 @@ func loadFromDB(dbPath string, sampleStart, sampleEnd time.Time, minCycleTime ti
 			ageDays = 0
 		}
 		inProgress = append(inProgress, reportItem{
-			Identifier: it.Identifier,
-			Title:      it.Title,
-			Assignee:   it.Assignee,
-			Project:    it.Project,
-			StartedAt:  it.StartedAt,
-			AgeDays:    ageDays,
+			Identifier:  it.Identifier,
+			Title:       it.Title,
+			Assignee:    it.Assignee,
+			ProjectName: it.ProjectName,
+			StartedAt:   it.StartedAt,
+			AgeDays:     ageDays,
 		})
 	}
 
@@ -270,12 +270,12 @@ func main() {
 					ageDays = 0
 				}
 				inProgress = append(inProgress, reportItem{
-					Identifier: iss.Identifier,
-					Title:      iss.Title,
-					Assignee:   iss.Engineer,
-					Project:    iss.Project,
-					StartedAt:  startedAt,
-					AgeDays:    ageDays,
+					Identifier:  iss.Identifier,
+					Title:       iss.Title,
+					Assignee:    iss.Engineer,
+					ProjectName: iss.ProjectName,
+					StartedAt:   startedAt,
+					AgeDays:     ageDays,
 				})
 			}
 		}
@@ -342,26 +342,26 @@ func outputText(items []reportItem, cycleTimes []float64, p85 float64, sampleSta
 }
 
 type jsonItem struct {
-	Identifier string  `json:"identifier"`
-	Title      string  `json:"title"`
-	Assignee   string  `json:"assignee"`
-	Project    string  `json:"project,omitempty"`
-	StartedAt  string  `json:"started_at"`
-	AgeDays    float64 `json:"age_days"`
-	Percentile int     `json:"percentile"`
+	Identifier  string  `json:"identifier"`
+	Title       string  `json:"title"`
+	Assignee    string  `json:"assignee"`
+	ProjectName string  `json:"project_name,omitempty"`
+	StartedAt   string  `json:"started_at"`
+	AgeDays     float64 `json:"age_days"`
+	Percentile  int     `json:"percentile"`
 }
 
 func outputJSON(items []reportItem) {
 	out := make([]jsonItem, len(items))
 	for i, item := range items {
 		out[i] = jsonItem{
-			Identifier: item.Identifier,
-			Title:      item.Title,
-			Assignee:   item.Assignee,
-			Project:    item.Project,
-			StartedAt:  item.StartedAt.Format("2006-01-02"),
-			AgeDays:    math.Round(item.AgeDays*10) / 10,
-			Percentile: item.Percentile,
+			Identifier:  item.Identifier,
+			Title:       item.Title,
+			Assignee:    item.Assignee,
+			ProjectName: item.ProjectName,
+			StartedAt:   item.StartedAt.Format("2006-01-02"),
+			AgeDays:     math.Round(item.AgeDays*10) / 10,
+			Percentile:  item.Percentile,
 		}
 	}
 	enc := json.NewEncoder(os.Stdout)

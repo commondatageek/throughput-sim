@@ -187,22 +187,36 @@ func toItem(n issueNode) (item.Item, bool) {
 		teamName = n.Team.Name
 	}
 	projectName := ""
+	projectID := ""
 	if n.Project != nil {
 		projectName = n.Project.Name
+		projectID = n.Project.ID
+	}
+	milestoneID := ""
+	milestoneName := ""
+	if n.ProjectMilestone != nil {
+		milestoneID = n.ProjectMilestone.ID
+		milestoneName = n.ProjectMilestone.Name
 	}
 
 	return item.Item{
-		Source:      "linear",
-		Identifier:  n.Identifier,
-		Title:       n.Title,
-		Assignee:    n.Assignee.Name,
-		Team:        teamName,
-		Project:     projectName,
-		Status:      status,
-		CreatedAt:   n.CreatedAt,
-		StartedAt:   n.StartedAt,
-		CompletedAt: n.CompletedAt,
-		UpdatedAt:   n.UpdatedAt,
+		Source:           "linear",
+		Identifier:       n.Identifier,
+		Title:            n.Title,
+		Assignee:         n.Assignee.Name,
+		Team:             teamName,
+		ProjectName:      projectName,
+		ProjectID:        projectID,
+		MilestoneID:      milestoneID,
+		MilestoneName:    milestoneName,
+		Status:           status,
+		CreatedAt:        n.CreatedAt,
+		StartedAt:        n.StartedAt,
+		CompletedAt:      n.CompletedAt,
+		ArchivedAt:       n.ArchivedAt,
+		AutoArchivedAt:   n.AutoArchivedAt,
+		AddedToProjectAt: n.AddedToProjectAt,
+		UpdatedAt:        n.UpdatedAt,
 	}, true
 }
 
@@ -244,6 +258,9 @@ query FetchIssues($after: String) {
       startedAt
       completedAt
       updatedAt
+      archivedAt
+      autoArchivedAt
+      addedToProjectAt
       assignee {
         name
       }
@@ -251,6 +268,11 @@ query FetchIssues($after: String) {
         name
       }
       project {
+        id
+        name
+      }
+      projectMilestone {
+        id
         name
       }
     }
@@ -276,15 +298,19 @@ type pageInfo struct {
 }
 
 type issueNode struct {
-	Identifier  string      `json:"identifier"`
-	Title       string      `json:"title"`
-	CreatedAt   time.Time   `json:"createdAt"`
-	StartedAt   time.Time   `json:"startedAt"`
-	CompletedAt time.Time   `json:"completedAt"`
-	UpdatedAt   time.Time   `json:"updatedAt"`
-	Assignee    *assignee   `json:"assignee"`
-	Team        *teamRef    `json:"team"`
-	Project     *projectRef `json:"project"`
+	Identifier       string        `json:"identifier"`
+	Title            string        `json:"title"`
+	CreatedAt        time.Time     `json:"createdAt"`
+	StartedAt        time.Time     `json:"startedAt"`
+	CompletedAt      time.Time     `json:"completedAt"`
+	UpdatedAt        time.Time     `json:"updatedAt"`
+	ArchivedAt       time.Time     `json:"archivedAt"`
+	AutoArchivedAt   time.Time     `json:"autoArchivedAt"`
+	AddedToProjectAt time.Time     `json:"addedToProjectAt"`
+	Assignee         *assignee     `json:"assignee"`
+	Team             *teamRef      `json:"team"`
+	Project          *projectRef   `json:"project"`
+	ProjectMilestone *milestoneRef `json:"projectMilestone"`
 }
 
 type assignee struct {
@@ -296,6 +322,12 @@ type teamRef struct {
 }
 
 type projectRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type milestoneRef struct {
+	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 

@@ -7,17 +7,23 @@ import (
 
 // Item is the vendor-neutral record produced by every Source and persisted by the store.
 type Item struct {
-	Source      string // "linear", "jira", ...
-	Identifier  string // human id, e.g. "ENG-123" — unique within a source
-	Title       string
-	Assignee    string
-	Team        string
-	Project     string
-	Status      string // plain string for now: "completed", "started", ...
-	CreatedAt   time.Time
-	StartedAt   time.Time
-	CompletedAt time.Time
-	UpdatedAt   time.Time // drives incremental fetch
+	Source           string // "linear", "jira", ...
+	Identifier       string // human id, e.g. "ENG-123" — unique within a source
+	Title            string
+	Assignee         string
+	Team             string
+	ProjectName      string
+	ProjectID        string
+	MilestoneID      string
+	MilestoneName    string
+	Status           string // plain string for now: "completed", "started", ...
+	CreatedAt        time.Time
+	StartedAt        time.Time
+	CompletedAt      time.Time
+	ArchivedAt       time.Time
+	AutoArchivedAt   time.Time
+	AddedToProjectAt time.Time
+	UpdatedAt        time.Time // drives incremental fetch
 }
 
 // Source is implemented by each upstream tool (Linear, Jira, CSV, ...).

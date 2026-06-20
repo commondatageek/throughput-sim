@@ -58,20 +58,28 @@ func (s *Store) Close() error {
 func (s *Store) Upsert(ctx context.Context, items ...item.Item) error {
 	const q = `
 INSERT INTO items
-    (source, identifier, title, assignee, team, project, status,
-     created_at, started_at, completed_at, updated_at)
+    (source, identifier, title, assignee, team, project_name, project_id,
+     milestone_id, milestone_name, status,
+     created_at, started_at, completed_at, archived_at, auto_archived_at,
+     added_to_project_at, updated_at)
 VALUES
-    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(source, identifier) DO UPDATE SET
-    title        = excluded.title,
-    assignee     = excluded.assignee,
-    team         = excluded.team,
-    project      = excluded.project,
-    status       = excluded.status,
-    created_at   = excluded.created_at,
-    started_at   = excluded.started_at,
-    completed_at = excluded.completed_at,
-    updated_at   = excluded.updated_at`
+    title               = excluded.title,
+    assignee            = excluded.assignee,
+    team                = excluded.team,
+    project_name        = excluded.project_name,
+    project_id          = excluded.project_id,
+    milestone_id        = excluded.milestone_id,
+    milestone_name      = excluded.milestone_name,
+    status              = excluded.status,
+    created_at          = excluded.created_at,
+    started_at          = excluded.started_at,
+    completed_at        = excluded.completed_at,
+    archived_at         = excluded.archived_at,
+    auto_archived_at    = excluded.auto_archived_at,
+    added_to_project_at = excluded.added_to_project_at,
+    updated_at          = excluded.updated_at`
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -92,11 +100,17 @@ ON CONFLICT(source, identifier) DO UPDATE SET
 			it.Title,
 			it.Assignee,
 			it.Team,
-			it.Project,
+			it.ProjectName,
+			it.ProjectID,
+			it.MilestoneID,
+			it.MilestoneName,
 			it.Status,
 			nullTime(it.CreatedAt),
 			nullTime(it.StartedAt),
 			nullTime(it.CompletedAt),
+			nullTime(it.ArchivedAt),
+			nullTime(it.AutoArchivedAt),
+			nullTime(it.AddedToProjectAt),
 			nullTime(it.UpdatedAt),
 		)
 		if err != nil {
@@ -137,7 +151,7 @@ func (s *Store) LatestUpdatedAt(ctx context.Context, source string) (time.Time, 
 // Status, StartedAt, CompletedAt, and UpdatedAt populated.
 func (s *Store) CompletedBetween(ctx context.Context, source string, start, end time.Time, assignees []string) ([]item.Item, error) {
 	q := `
-SELECT source, identifier, title, assignee, team, project, status,
+SELECT source, identifier, title, assignee, team, project_name, status,
        started_at, completed_at, updated_at
 FROM items
 WHERE source = ?
@@ -171,7 +185,7 @@ WHERE source = ?
 		var startedAt, completedAt, updatedAt sql.NullTime
 		if err := rows.Scan(
 			&it.Source, &it.Identifier, &it.Title, &it.Assignee,
-			&it.Team, &it.Project, &it.Status,
+			&it.Team, &it.ProjectName, &it.Status,
 			&startedAt, &completedAt, &updatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("CompletedBetween scan: %w", err)
@@ -194,7 +208,7 @@ WHERE source = ?
 // non-NULL started_at. Results are ordered by started_at ascending.
 func (s *Store) InProgress(ctx context.Context, source string) ([]item.Item, error) {
 	const q = `
-SELECT source, identifier, title, assignee, team, project, status, started_at
+SELECT source, identifier, title, assignee, team, project_name, status, started_at
 FROM items
 WHERE source = ?
   AND status = 'in_progress'
@@ -213,7 +227,7 @@ ORDER BY started_at ASC`
 		var startedAt sql.NullTime
 		if err := rows.Scan(
 			&it.Source, &it.Identifier, &it.Title, &it.Assignee,
-			&it.Team, &it.Project, &it.Status, &startedAt,
+			&it.Team, &it.ProjectName, &it.Status, &startedAt,
 		); err != nil {
 			return nil, fmt.Errorf("InProgress scan: %w", err)
 		}

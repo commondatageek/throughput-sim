@@ -18,7 +18,7 @@ type outputIssue struct {
 	Team        string `json:"team"`
 	Identifier  string `json:"identifier"`
 	Title       string `json:"title"`
-	Project     string `json:"project"`
+	ProjectName string `json:"project_name"`
 	StartedAt   string `json:"started_at,omitempty"`
 	CompletedAt string `json:"completed_at,omitempty"`
 	Status      string `json:"status"`
@@ -83,7 +83,7 @@ func main() {
 			Team:        it.Team,
 			Identifier:  it.Identifier,
 			Title:       it.Title,
-			Project:     it.Project,
+			ProjectName: it.ProjectName,
 			StartedAt:   startedAt,
 			CompletedAt: completedAt,
 			Status:      it.Status,
