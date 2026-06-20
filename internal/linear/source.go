@@ -1,4 +1,4 @@
-// Package linear implements item.Source for the Linear.app GraphQL API.
+// Package linear implements a client for the Linear.app GraphQL API.
 package linear
 
 import (
@@ -11,36 +11,31 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	"forecasting/internal/item"
 )
 
 const endpoint = "https://api.linear.app/graphql"
 
-// Source fetches issues from Linear and converts them to item.Item.
-type Source struct {
+// Client fetches issues from Linear and converts them to Issue.
+type Client struct {
 	apiKey   string
 	teamKeys []string // empty = all teams
 	client   *http.Client
 }
 
-// New creates a Linear Source. teamKeys may be empty to fetch all accessible teams.
-func New(apiKey string, teamKeys []string) *Source {
-	return &Source{
+// New creates a Linear Client. teamKeys may be empty to fetch all accessible teams.
+func New(apiKey string, teamKeys []string) *Client {
+	return &Client{
 		apiKey:   apiKey,
 		teamKeys: teamKeys,
 		client:   &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
-// Name implements item.Source.
-func (s *Source) Name() string { return "linear" }
-
-// Fetch implements item.Source. since == zero means full fetch.
-func (s *Source) Fetch(ctx context.Context, since time.Time) ([]item.Item, error) {
+// Fetch retrieves issues updated since the given time. since == zero means full fetch.
+func (s *Client) Fetch(ctx context.Context, since time.Time) ([]Issue, error) {
 	query := buildQuery(s.teamKeys, since)
 
-	var items []item.Item
+	var issues []Issue
 	var cursor string
 
 	for {
@@ -50,11 +45,11 @@ func (s *Source) Fetch(ctx context.Context, since time.Time) ([]item.Item, error
 		}
 
 		for _, node := range resp.Data.Issues.Nodes {
-			it, ok := toItem(node)
+			iss, ok := toIssue(node)
 			if !ok {
 				continue
 			}
-			items = append(items, it)
+			issues = append(issues, iss)
 		}
 
 		if !resp.Data.Issues.PageInfo.HasNextPage {
@@ -63,12 +58,12 @@ func (s *Source) Fetch(ctx context.Context, since time.Time) ([]item.Item, error
 		cursor = resp.Data.Issues.PageInfo.EndCursor
 	}
 
-	return items, nil
+	return issues, nil
 }
 
 // ListTeams writes accessible teams to the provided writer (for CLI use),
 // sorted in ascending alphabetical order by team key.
-func (s *Source) ListTeams(ctx context.Context, w io.Writer) error {
+func (s *Client) ListTeams(ctx context.Context, w io.Writer) error {
 	var teams []teamNode
 	var cursor string
 
@@ -115,7 +110,7 @@ func (s *Source) ListTeams(ctx context.Context, w io.Writer) error {
 
 // --- internal helpers ---
 
-func (s *Source) fetchPage(ctx context.Context, query, cursor string) (*gqlResponse, error) {
+func (s *Client) fetchPage(ctx context.Context, query, cursor string) (*gqlResponse, error) {
 	vars := map[string]any{}
 	if cursor != "" {
 		vars["after"] = cursor
@@ -141,7 +136,7 @@ func (s *Source) fetchPage(ctx context.Context, query, cursor string) (*gqlRespo
 	return &resp, nil
 }
 
-func (s *Source) do(ctx context.Context, body []byte) ([]byte, error) {
+func (s *Client) do(ctx context.Context, body []byte) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
@@ -165,21 +160,16 @@ func (s *Source) do(ctx context.Context, body []byte) ([]byte, error) {
 	return raw, nil
 }
 
-// toItem converts an issueNode to an item.Item.
-// Returns (item, false) if the issue should be skipped (e.g. no assignee).
-func toItem(n issueNode) (item.Item, bool) {
+// toIssue converts an issueNode to an Issue.
+// Returns (Issue{}, false) if the issue should be skipped (e.g. no assignee).
+func toIssue(n issueNode) (Issue, bool) {
 	if n.Assignee == nil {
-		return item.Item{}, false
-	}
-
-	status := "in_progress"
-	if !n.CompletedAt.IsZero() {
-		status = "completed"
+		return Issue{}, false
 	}
 
 	// In-progress issues without a startedAt can't be used for aging.
-	if status == "in_progress" && n.StartedAt.IsZero() {
-		return item.Item{}, false
+	if n.CompletedAt.IsZero() && n.StartedAt.IsZero() {
+		return Issue{}, false
 	}
 
 	teamName := ""
@@ -198,30 +188,28 @@ func toItem(n issueNode) (item.Item, bool) {
 		milestoneID = n.ProjectMilestone.ID
 		milestoneName = n.ProjectMilestone.Name
 	}
-	statusType := ""
+	stateType := ""
 	if n.State != nil {
-		statusType = n.State.Type
+		stateType = n.State.Type
 	}
 
-	return item.Item{
-		Source:           "linear",
-		Identifier:       n.Identifier,
-		Title:            n.Title,
-		Assignee:         n.Assignee.Name,
-		Team:             teamName,
-		ProjectName:      projectName,
-		ProjectID:        projectID,
-		MilestoneID:      milestoneID,
-		MilestoneName:    milestoneName,
-		Status:           status,
-		StatusType:       statusType,
-		CreatedAt:        n.CreatedAt,
-		StartedAt:        n.StartedAt,
-		CompletedAt:      n.CompletedAt,
-		ArchivedAt:       n.ArchivedAt,
-		AutoArchivedAt:   n.AutoArchivedAt,
-		AddedToProjectAt: n.AddedToProjectAt,
-		UpdatedAt:        n.UpdatedAt,
+	return Issue{
+		Identifier:           n.Identifier,
+		Title:                n.Title,
+		Assignee:             n.Assignee.Name,
+		Team:                 teamName,
+		ProjectID:            projectID,
+		ProjectName:          projectName,
+		ProjectMilestoneID:   milestoneID,
+		ProjectMilestoneName: milestoneName,
+		StateType:            stateType,
+		CreatedAt:            n.CreatedAt,
+		StartedAt:            n.StartedAt,
+		CompletedAt:          n.CompletedAt,
+		ArchivedAt:           n.ArchivedAt,
+		AutoArchivedAt:       n.AutoArchivedAt,
+		AddedToProjectAt:     n.AddedToProjectAt,
+		UpdatedAt:            n.UpdatedAt,
 	}, true
 }
 
