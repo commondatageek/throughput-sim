@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"forecasting/internal/linear"
@@ -13,20 +14,25 @@ import (
 )
 
 func main() {
+	// The db path is a leading positional argument (e.g. "sync data.db
+	// -teams eng"), but Go's flag package stops parsing at the first
+	// non-flag argument, so it must be pulled off os.Args before the flags
+	// are parsed rather than read via flag.Arg(0) afterward.
+	args := os.Args[1:]
+	if len(args) == 0 || strings.HasPrefix(args[0], "-") {
+		fmt.Fprintln(os.Stderr, "error: usage: sync <db-path> [-teams k1,k2] [-all-teams] [-full-reload]")
+		os.Exit(1)
+	}
+	dbPath, args := args[0], args[1:]
+
 	var teams linear.KeyList
 	flag.Var(&teams, "teams", "comma-separated team keys, e.g. ENG,DESIGN; limits the candidate team set")
 	allTeams := flag.Bool("all-teams", false, "expand the candidate team set to every accessible Linear team; mutually exclusive with -teams")
 	fullReload := flag.Bool("full-reload", false, "ignore each team's stored watermark and do a full reload")
 
-	flag.Parse()
+	flag.CommandLine.Parse(args)
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
-
-	dbPath := flag.Arg(0)
-	if dbPath == "" {
-		fmt.Fprintln(os.Stderr, "error: usage: sync <db-path> [-teams k1,k2] [-all-teams] [-full-reload]")
-		os.Exit(1)
-	}
 
 	apiKey, err := linear.GetAPIKey()
 	if err != nil {
