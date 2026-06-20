@@ -32,14 +32,14 @@ func New(apiKey string, teamKeys []string) *Client {
 }
 
 // Fetch retrieves issues updated since the given time. since == zero means full fetch.
-func (s *Client) Fetch(ctx context.Context, since time.Time) ([]Issue, error) {
-	query := buildQuery(s.teamKeys, since)
+func (c *Client) Fetch(ctx context.Context, since time.Time) ([]Issue, error) {
+	query := buildQuery(c.teamKeys, since)
 
 	var issues []Issue
 	var cursor string
 
 	for {
-		resp, err := s.fetchPage(ctx, query, cursor)
+		resp, err := c.fetchPage(ctx, query, cursor)
 		if err != nil {
 			return nil, err
 		}
@@ -59,7 +59,7 @@ func (s *Client) Fetch(ctx context.Context, since time.Time) ([]Issue, error) {
 
 // ListTeams writes accessible teams to the provided writer (for CLI use),
 // sorted in ascending alphabetical order by team key.
-func (s *Client) ListTeams(ctx context.Context, w io.Writer) error {
+func (c *Client) ListTeams(ctx context.Context, w io.Writer) error {
 	var teams []teamNode
 	var cursor string
 
@@ -74,7 +74,7 @@ func (s *Client) ListTeams(ctx context.Context, w io.Writer) error {
 			return fmt.Errorf("marshal request: %w", err)
 		}
 
-		raw, err := s.do(ctx, body)
+		raw, err := c.do(ctx, body)
 		if err != nil {
 			return err
 		}
@@ -106,7 +106,7 @@ func (s *Client) ListTeams(ctx context.Context, w io.Writer) error {
 
 // --- internal helpers ---
 
-func (s *Client) fetchPage(ctx context.Context, query, cursor string) (*gqlResponse, error) {
+func (c *Client) fetchPage(ctx context.Context, query, cursor string) (*gqlResponse, error) {
 	vars := map[string]any{}
 	if cursor != "" {
 		vars["after"] = cursor
@@ -117,7 +117,7 @@ func (s *Client) fetchPage(ctx context.Context, query, cursor string) (*gqlRespo
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	raw, err := s.do(ctx, body)
+	raw, err := c.do(ctx, body)
 	if err != nil {
 		return nil, err
 	}
@@ -132,15 +132,15 @@ func (s *Client) fetchPage(ctx context.Context, query, cursor string) (*gqlRespo
 	return &resp, nil
 }
 
-func (s *Client) do(ctx context.Context, body []byte) ([]byte, error) {
+func (c *Client) do(ctx context.Context, body []byte) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", s.apiKey)
+	req.Header.Set("Authorization", c.apiKey)
 
-	resp, err := s.client.Do(req)
+	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("execute request: %w", err)
 	}
