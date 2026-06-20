@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -222,30 +223,54 @@ func TestInProgress(t *testing.T) {
 	}
 }
 
-func TestLatestUpdatedAt(t *testing.T) {
+func TestLatestUpdatedAtForTeam(t *testing.T) {
 	store := openTestStore(t)
 	ctx := context.Background()
 
-	zero, err := store.LatestUpdatedAt(ctx)
+	zero, err := store.LatestUpdatedAtForTeam(ctx, "ENG")
 	if err != nil {
-		t.Fatalf("LatestUpdatedAt on empty db: %v", err)
+		t.Fatalf("LatestUpdatedAtForTeam on empty db: %v", err)
 	}
 	if !zero.IsZero() {
-		t.Fatalf("LatestUpdatedAt on empty db = %v, want zero time", zero)
+		t.Fatalf("LatestUpdatedAtForTeam on empty db = %v, want zero time", zero)
 	}
 
-	older := linear.Issue{Identifier: "ENG-1", UpdatedAt: mustParse(t, "2024-01-01T00:00:00Z")}
-	newer := linear.Issue{Identifier: "ENG-2", UpdatedAt: mustParse(t, "2024-01-10T00:00:00Z")}
-	if err := store.Upsert(ctx, older, newer); err != nil {
+	older := linear.Issue{Identifier: "ENG-1", TeamKey: "ENG", UpdatedAt: mustParse(t, "2024-01-01T00:00:00Z")}
+	newer := linear.Issue{Identifier: "ENG-2", TeamKey: "ENG", UpdatedAt: mustParse(t, "2024-01-10T00:00:00Z")}
+	otherTeam := linear.Issue{Identifier: "DATA-1", TeamKey: "DATA", UpdatedAt: mustParse(t, "2024-06-01T00:00:00Z")}
+	if err := store.Upsert(ctx, older, newer, otherTeam); err != nil {
 		t.Fatalf("Upsert: %v", err)
 	}
 
-	got, err := store.LatestUpdatedAt(ctx)
+	got, err := store.LatestUpdatedAtForTeam(ctx, "ENG")
 	if err != nil {
-		t.Fatalf("LatestUpdatedAt: %v", err)
+		t.Fatalf("LatestUpdatedAtForTeam: %v", err)
 	}
 	if !got.Equal(newer.UpdatedAt) {
-		t.Fatalf("LatestUpdatedAt = %v, want %v", got, newer.UpdatedAt)
+		t.Fatalf("LatestUpdatedAtForTeam(ENG) = %v, want %v (other teams' watermarks must not leak in)", got, newer.UpdatedAt)
+	}
+}
+
+func TestDistinctTeamKeys(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+
+	if err := store.Upsert(ctx,
+		linear.Issue{Identifier: "ENG-1", TeamKey: "ENG"},
+		linear.Issue{Identifier: "DATA-1", TeamKey: "DATA"},
+		linear.Issue{Identifier: "ENG-2", TeamKey: "ENG"},
+		linear.Issue{Identifier: "NOTEAM-1", TeamKey: ""},
+	); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+
+	got, err := store.DistinctTeamKeys(ctx)
+	if err != nil {
+		t.Fatalf("DistinctTeamKeys: %v", err)
+	}
+	want := []string{"DATA", "ENG"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("DistinctTeamKeys = %v, want %v", got, want)
 	}
 }
 

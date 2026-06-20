@@ -58,16 +58,17 @@ func (s *Store) Close() error {
 func (s *Store) Upsert(ctx context.Context, issues ...linear.Issue) error {
 	const q = `
 INSERT INTO issues
-    (identifier, title, assignee, team, project_id, project_name,
+    (identifier, title, assignee, team_key, team_name, project_id, project_name,
      project_milestone_id, project_milestone_name, state_type, state_name,
      created_at, started_at, completed_at, archived_at, auto_archived_at,
      added_to_project_at, updated_at)
 VALUES
-    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(identifier) DO UPDATE SET
     title                  = excluded.title,
     assignee               = excluded.assignee,
-    team                   = excluded.team,
+    team_key               = excluded.team_key,
+    team_name              = excluded.team_name,
     project_id             = excluded.project_id,
     project_name           = excluded.project_name,
     project_milestone_id   = excluded.project_milestone_id,
@@ -99,7 +100,8 @@ ON CONFLICT(identifier) DO UPDATE SET
 			it.Identifier,
 			it.Title,
 			nullString(it.Assignee),
-			it.Team,
+			it.TeamKey,
+			it.TeamName,
 			nullString(it.ProjectID),
 			nullString(it.ProjectName),
 			nullString(it.ProjectMilestoneID),
@@ -122,26 +124,49 @@ ON CONFLICT(identifier) DO UPDATE SET
 	return tx.Commit()
 }
 
-// LatestUpdatedAt returns the maximum updated_at across all issues.
-// Returns zero time if no issues exist yet (signals a full fetch).
-func (s *Store) LatestUpdatedAt(ctx context.Context) (time.Time, error) {
+// LatestUpdatedAtForTeam returns the maximum updated_at among issues for the
+// given team key. Returns zero time if the team has no issues yet (signals a
+// full fetch for that team).
+func (s *Store) LatestUpdatedAtForTeam(ctx context.Context, teamKey string) (time.Time, error) {
 	// Selecting the updated_at column directly (rather than MAX(updated_at))
 	// keeps the result typed as DATETIME, which the sqlite driver requires
 	// in order to scan it back into a time.Time instead of a string.
 	row := s.db.QueryRowContext(ctx,
-		`SELECT updated_at FROM issues ORDER BY updated_at DESC LIMIT 1`)
+		`SELECT updated_at FROM issues WHERE team_key = ? ORDER BY updated_at DESC LIMIT 1`,
+		teamKey)
 
 	var ts sql.NullTime
 	if err := row.Scan(&ts); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return time.Time{}, nil
 		}
-		return time.Time{}, fmt.Errorf("latest updated_at: %w", err)
+		return time.Time{}, fmt.Errorf("latest updated_at for team %s: %w", teamKey, err)
 	}
 	if !ts.Valid {
 		return time.Time{}, nil
 	}
 	return ts.Time, nil
+}
+
+// DistinctTeamKeys returns every non-empty team_key currently present in the
+// store, ordered alphabetically.
+func (s *Store) DistinctTeamKeys(ctx context.Context) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT DISTINCT team_key FROM issues WHERE team_key <> '' ORDER BY team_key`)
+	if err != nil {
+		return nil, fmt.Errorf("distinct team keys: %w", err)
+	}
+	defer rows.Close()
+
+	var keys []string
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, fmt.Errorf("distinct team keys scan: %w", err)
+		}
+		keys = append(keys, key)
+	}
+	return keys, rows.Err()
 }
 
 // CompletedBetween returns completed issues whose completed_at falls within
@@ -161,7 +186,7 @@ func (s *Store) LatestUpdatedAt(ctx context.Context) (time.Time, error) {
 // StateType, StartedAt, CompletedAt, and UpdatedAt populated.
 func (s *Store) CompletedBetween(ctx context.Context, start, end time.Time, assignees []string) ([]linear.Issue, error) {
 	q := `
-SELECT identifier, title, assignee, team, project_name, state_type,
+SELECT identifier, title, assignee, team_name, project_name, state_type,
        started_at, completed_at, updated_at
 FROM issues
 WHERE state_type = 'completed'
@@ -197,7 +222,7 @@ WHERE state_type = 'completed'
 		var startedAt, completedAt, updatedAt sql.NullTime
 		if err := rows.Scan(
 			&it.Identifier, &it.Title, &assignee,
-			&it.Team, &projectName, &it.StateType,
+			&it.TeamName, &projectName, &it.StateType,
 			&startedAt, &completedAt, &updatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("CompletedBetween scan: %w", err)
@@ -222,7 +247,7 @@ WHERE state_type = 'completed'
 // non-NULL started_at. Results are ordered by started_at ascending.
 func (s *Store) InProgress(ctx context.Context) ([]linear.Issue, error) {
 	const q = `
-SELECT identifier, title, assignee, team, project_name, state_type, state_name, started_at
+SELECT identifier, title, assignee, team_name, project_name, state_type, state_name, started_at
 FROM issues
 WHERE state_type = 'started'
   AND started_at IS NOT NULL
@@ -241,7 +266,7 @@ ORDER BY started_at ASC`
 		var startedAt sql.NullTime
 		if err := rows.Scan(
 			&it.Identifier, &it.Title, &assignee,
-			&it.Team, &projectName, &it.StateType, &it.StateName, &startedAt,
+			&it.TeamName, &projectName, &it.StateType, &it.StateName, &startedAt,
 		); err != nil {
 			return nil, fmt.Errorf("InProgress scan: %w", err)
 		}
