@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"forecasting/internal/item"
+	"forecasting/internal/linear"
 
 	"github.com/pressly/goose/v3"
 	_ "modernc.org/sqlite"
@@ -17,7 +17,7 @@ import (
 //go:embed migrations/*.sql
 var migrationsFS embed.FS
 
-// Store is the concrete SQLite-backed item store.
+// Store is the concrete SQLite-backed issue store.
 // All SQL in this repo lives here.
 type Store struct {
 	db *sql.DB
@@ -54,33 +54,32 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
-// Upsert inserts or updates items. The unique key is (source, identifier).
-func (s *Store) Upsert(ctx context.Context, items ...item.Item) error {
+// Upsert inserts or updates issues. The unique key is identifier.
+func (s *Store) Upsert(ctx context.Context, issues ...linear.Issue) error {
 	const q = `
-INSERT INTO items
-    (source, identifier, title, assignee, team, project_name, project_id,
-     milestone_id, milestone_name, status, status_type,
+INSERT INTO issues
+    (identifier, title, assignee, team, project_id, project_name,
+     project_milestone_id, project_milestone_name, state_type,
      created_at, started_at, completed_at, archived_at, auto_archived_at,
      added_to_project_at, updated_at)
 VALUES
-    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT(source, identifier) DO UPDATE SET
-    title               = excluded.title,
-    assignee            = excluded.assignee,
-    team                = excluded.team,
-    project_name        = excluded.project_name,
-    project_id          = excluded.project_id,
-    milestone_id        = excluded.milestone_id,
-    milestone_name      = excluded.milestone_name,
-    status              = excluded.status,
-    status_type         = excluded.status_type,
-    created_at          = excluded.created_at,
-    started_at          = excluded.started_at,
-    completed_at        = excluded.completed_at,
-    archived_at         = excluded.archived_at,
-    auto_archived_at    = excluded.auto_archived_at,
-    added_to_project_at = excluded.added_to_project_at,
-    updated_at          = excluded.updated_at`
+    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(identifier) DO UPDATE SET
+    title                  = excluded.title,
+    assignee               = excluded.assignee,
+    team                   = excluded.team,
+    project_id             = excluded.project_id,
+    project_name           = excluded.project_name,
+    project_milestone_id   = excluded.project_milestone_id,
+    project_milestone_name = excluded.project_milestone_name,
+    state_type             = excluded.state_type,
+    created_at             = excluded.created_at,
+    started_at             = excluded.started_at,
+    completed_at           = excluded.completed_at,
+    archived_at            = excluded.archived_at,
+    auto_archived_at       = excluded.auto_archived_at,
+    added_to_project_at    = excluded.added_to_project_at,
+    updated_at             = excluded.updated_at`
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -94,19 +93,17 @@ ON CONFLICT(source, identifier) DO UPDATE SET
 	}
 	defer stmt.Close()
 
-	for _, it := range items {
+	for _, it := range issues {
 		_, err := stmt.ExecContext(ctx,
-			it.Source,
 			it.Identifier,
 			it.Title,
 			it.Assignee,
 			it.Team,
-			it.ProjectName,
 			it.ProjectID,
-			it.MilestoneID,
-			it.MilestoneName,
-			it.Status,
-			it.StatusType,
+			it.ProjectName,
+			it.ProjectMilestoneID,
+			it.ProjectMilestoneName,
+			it.StateType,
 			nullTime(it.CreatedAt),
 			nullTime(it.StartedAt),
 			nullTime(it.CompletedAt),
@@ -116,21 +113,21 @@ ON CONFLICT(source, identifier) DO UPDATE SET
 			nullTime(it.UpdatedAt),
 		)
 		if err != nil {
-			return fmt.Errorf("upsert %s/%s: %w", it.Source, it.Identifier, err)
+			return fmt.Errorf("upsert %s: %w", it.Identifier, err)
 		}
 	}
 
 	return tx.Commit()
 }
 
-// LatestUpdatedAt returns the maximum updated_at for items from source.
-// Returns zero time if no items exist yet (signals a full fetch).
-func (s *Store) LatestUpdatedAt(ctx context.Context, source string) (time.Time, error) {
+// LatestUpdatedAt returns the maximum updated_at across all issues.
+// Returns zero time if no issues exist yet (signals a full fetch).
+func (s *Store) LatestUpdatedAt(ctx context.Context) (time.Time, error) {
 	// Selecting the updated_at column directly (rather than MAX(updated_at))
 	// keeps the result typed as DATETIME, which the sqlite driver requires
 	// in order to scan it back into a time.Time instead of a string.
 	row := s.db.QueryRowContext(ctx,
-		`SELECT updated_at FROM items WHERE source = ? ORDER BY updated_at DESC LIMIT 1`, source)
+		`SELECT updated_at FROM issues ORDER BY updated_at DESC LIMIT 1`)
 
 	var ts sql.NullTime
 	if err := row.Scan(&ts); err != nil {
@@ -145,23 +142,22 @@ func (s *Store) LatestUpdatedAt(ctx context.Context, source string) (time.Time, 
 	return ts.Time, nil
 }
 
-// CompletedBetween returns completed items whose completed_at falls within
+// CompletedBetween returns completed issues whose completed_at falls within
 // [start, end) — start inclusive, end exclusive. If assignees is non-empty,
-// only items whose assignee is in that set are returned.
+// only issues whose assignee is in that set are returned.
 //
-// Returned items have Source, Identifier, Title, Assignee, Team, Project,
-// Status, StatusType, StartedAt, CompletedAt, and UpdatedAt populated.
-func (s *Store) CompletedBetween(ctx context.Context, source string, start, end time.Time, assignees []string) ([]item.Item, error) {
+// Returned issues have Identifier, Title, Assignee, Team, ProjectName,
+// StateType, StartedAt, CompletedAt, and UpdatedAt populated.
+func (s *Store) CompletedBetween(ctx context.Context, start, end time.Time, assignees []string) ([]linear.Issue, error) {
 	q := `
-SELECT source, identifier, title, assignee, team, project_name, status, status_type,
+SELECT identifier, title, assignee, team, project_name, state_type,
        started_at, completed_at, updated_at
-FROM items
-WHERE source = ?
-  AND status = 'completed'
+FROM issues
+WHERE state_type = 'completed'
   AND completed_at >= ?
   AND completed_at < ?`
 
-	args := []any{source, start.UTC(), end.UTC()}
+	args := []any{start.UTC(), end.UTC()}
 
 	if len(assignees) > 0 {
 		placeholders := make([]byte, 0, len(assignees)*2)
@@ -181,13 +177,13 @@ WHERE source = ?
 	}
 	defer rows.Close()
 
-	var items []item.Item
+	var issues []linear.Issue
 	for rows.Next() {
-		var it item.Item
+		var it linear.Issue
 		var startedAt, completedAt, updatedAt sql.NullTime
 		if err := rows.Scan(
-			&it.Source, &it.Identifier, &it.Title, &it.Assignee,
-			&it.Team, &it.ProjectName, &it.Status, &it.StatusType,
+			&it.Identifier, &it.Title, &it.Assignee,
+			&it.Team, &it.ProjectName, &it.StateType,
 			&startedAt, &completedAt, &updatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("CompletedBetween scan: %w", err)
@@ -201,44 +197,43 @@ WHERE source = ?
 		if updatedAt.Valid {
 			it.UpdatedAt = updatedAt.Time
 		}
-		items = append(items, it)
+		issues = append(issues, it)
 	}
-	return items, rows.Err()
+	return issues, rows.Err()
 }
 
-// InProgress returns items whose status is 'in_progress' and that have a
+// InProgress returns issues whose state_type is 'started' and that have a
 // non-NULL started_at. Results are ordered by started_at ascending.
-func (s *Store) InProgress(ctx context.Context, source string) ([]item.Item, error) {
+func (s *Store) InProgress(ctx context.Context) ([]linear.Issue, error) {
 	const q = `
-SELECT source, identifier, title, assignee, team, project_name, status, status_type, started_at
-FROM items
-WHERE source = ?
-  AND status = 'in_progress'
+SELECT identifier, title, assignee, team, project_name, state_type, started_at
+FROM issues
+WHERE state_type = 'started'
   AND started_at IS NOT NULL
 ORDER BY started_at ASC`
 
-	rows, err := s.db.QueryContext(ctx, q, source)
+	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("InProgress: %w", err)
 	}
 	defer rows.Close()
 
-	var items []item.Item
+	var issues []linear.Issue
 	for rows.Next() {
-		var it item.Item
+		var it linear.Issue
 		var startedAt sql.NullTime
 		if err := rows.Scan(
-			&it.Source, &it.Identifier, &it.Title, &it.Assignee,
-			&it.Team, &it.ProjectName, &it.Status, &it.StatusType, &startedAt,
+			&it.Identifier, &it.Title, &it.Assignee,
+			&it.Team, &it.ProjectName, &it.StateType, &startedAt,
 		); err != nil {
 			return nil, fmt.Errorf("InProgress scan: %w", err)
 		}
 		if startedAt.Valid {
 			it.StartedAt = startedAt.Time
 		}
-		items = append(items, it)
+		issues = append(issues, it)
 	}
-	return items, rows.Err()
+	return issues, rows.Err()
 }
 
 // nullTime converts a time.Time to sql.NullTime, treating zero as NULL.
