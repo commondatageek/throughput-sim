@@ -66,6 +66,36 @@ Reads completed issues from the `issues` table of a SQLite database (default
 | `-sample-end` | today | End of historical sample window (YYYY-MM-DD) |
 | `-percentile` | `5,10,...,95` | Comma-separated percentiles to output |
 | `-include` | all | Comma-separated engineer names to include |
+| `-start-date` | today | Report start date for the grouped trajectory report (YYYY-MM-DD) |
+
+#### Grouped trajectory report
+
+Pass `-items` a comma-separated list to forecast a *sequence* of work groups
+(e.g. milestones) completed in order, instead of a single total:
+
+```sh
+./sim days \
+  -db linear.db \
+  -engineers 2 \
+  -items 13,12,9,5,2 \
+  -start-date 2026-06-17 \
+  -percentile 5,25,50,85,95
+```
+
+```
+2 equivalent engineers, starting 2026-06-17 -> grouped trajectory
+
+Group    Items  p5 Days  p5 Date     ...  p95 Days  p95 Date
+Group 1  13     4        2026-06-21  ...  8         2026-06-25
+Group 2  25     4        2026-06-25  ...  6         2026-07-01
+...
+Total    41     14       2026-07-01  ...  21        2026-07-08
+```
+
+Each group's `Days` is the marginal days to finish that group after all
+earlier groups; its `Date` is `-start-date` plus the cumulative days through
+that group. The `Total` row's `Days`/`Date` are for the full list. A single
+value (the default) keeps the original one-line-per-percentile output.
 
 ### `probability` — what is the probability of completing I items in D days?
 

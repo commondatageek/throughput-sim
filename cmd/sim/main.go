@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"text/tabwriter"
 	"time"
 
 	"forecasting/internal/linear"
@@ -642,19 +643,105 @@ func cmdItems(args []string) error {
 	return nil
 }
 
+// trajectoryCell is one (group, percentile) entry in the grouped trajectory
+// report: the marginal days to finish that group (after all earlier groups,
+// at this percentile) and the cumulative days from the start of the report.
+type trajectoryCell struct {
+	MarginalDays   int
+	CumulativeDays int
+}
+
+// computeTrajectoryTable turns per-threshold sorted day-distributions into the
+// grouped trajectory report's cells. dists[g] must be the sorted distribution
+// of days-to-complete the cumulative threshold sum(groups[:g+1]); all dists
+// must have been produced with the same RNG seed so that, within a single
+// trial, reaching a larger cumulative count never takes fewer days — this is
+// what guarantees MarginalDays >= 0 and that each percentile's marginal days
+// sum exactly to the Total row's days.
+//
+// The returned slice is indexed [group][percentileIndex]; totals are the
+// final group's cumulative days per percentile (i.e. equal to the last row).
+func computeTrajectoryTable(dists [][]int, percentiles []int) (cells [][]trajectoryCell, totals []int) {
+	cells = make([][]trajectoryCell, len(dists))
+	prevCum := make([]int, len(percentiles))
+	for g, dist := range dists {
+		cells[g] = make([]trajectoryCell, len(percentiles))
+		for pi, p := range percentiles {
+			cum := Percentile(dist, float64(p))
+			cells[g][pi] = trajectoryCell{
+				MarginalDays:   cum - prevCum[pi],
+				CumulativeDays: cum,
+			}
+			prevCum[pi] = cum
+		}
+	}
+	totals = append(totals, prevCum...)
+	return cells, totals
+}
+
+// printTrajectoryReport prints the grouped trajectory report for `sim days
+// -items g1,g2,...`: one row per group plus a Total row, with per-percentile
+// Days/Date columns. All thresholds are simulated with the same seed (see
+// computeTrajectoryTable) so the report's invariants hold.
+func printTrajectoryReport(pool *SamplePool, mode samplingMode, team []string, engineers int, seed int64, simulations, goroutines int, groups, percentiles []int, startDate time.Time) {
+	cum := make([]int, len(groups))
+	total := 0
+	for g, n := range groups {
+		total += n
+		cum[g] = total
+	}
+
+	dists := make([][]int, len(groups))
+	for g, threshold := range cum {
+		dists[g] = simulateDaysToComplete(pool, mode, team, engineers, threshold, simulations, goroutines, seed)
+	}
+	cells, totals := computeTrajectoryTable(dists, percentiles)
+
+	fmt.Printf("%s, starting %s -> grouped trajectory\n\n", modeLabel(mode, team, engineers), startDate.Format("2006-01-02"))
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	header := []string{"Group", "Items"}
+	for _, p := range percentiles {
+		header = append(header, fmt.Sprintf("p%d Days", p), fmt.Sprintf("p%d Date", p))
+	}
+	fmt.Fprintln(w, strings.Join(header, "\t"))
+
+	for g := range groups {
+		row := []string{fmt.Sprintf("Group %d", g+1), fmt.Sprintf("%d", cum[g])}
+		for pi := range percentiles {
+			cell := cells[g][pi]
+			date := startDate.AddDate(0, 0, cell.CumulativeDays)
+			row = append(row, fmt.Sprintf("%d", cell.MarginalDays), date.Format("2006-01-02"))
+		}
+		fmt.Fprintln(w, strings.Join(row, "\t"))
+	}
+
+	totalRow := []string{"Total", fmt.Sprintf("%d", total)}
+	for pi := range percentiles {
+		days := totals[pi]
+		date := startDate.AddDate(0, 0, days)
+		totalRow = append(totalRow, fmt.Sprintf("%d", days), date.Format("2006-01-02"))
+	}
+	fmt.Fprintln(w, strings.Join(totalRow, "\t"))
+
+	w.Flush()
+}
+
 func cmdDays(args []string) error {
 	defaultSampleStart, defaultSampleEnd := defaultDateRange()
 	cmd := flag.NewFlagSet("days", flag.ExitOnError)
 	dbFile := cmd.String("db", "linear.db", "path to SQLite database")
 	exclusionsFile := cmd.String("exclusions", "exclusions.json", "path to exclusions JSON file")
 	engineers := cmd.Int("engineers", 3, "number of (equivalent) engineers")
-	items := cmd.Int("items", 50, "number of items to complete")
+	items := intList{50}
+	cmd.Var(&items, "items", "number of items to complete; comma-separated for a grouped trajectory report (e.g. 13,12,9)")
 	wholeTeam := cmd.Bool("whole-team", false, "use whole-team daily throughput from historical data (ignores -engineers)")
 	simulations := cmd.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
 	goroutines := cmd.Int("goroutines", runtime.NumCPU(), "number of parallel worker goroutines")
 	sampleStart := cmd.String("sample-start", defaultSampleStart, "sample data start date (YYYY-MM-DD)")
 	sampleEnd := cmd.String("sample-end", defaultSampleEnd, "sample data end date (YYYY-MM-DD)")
 	randomSeed := cmd.Int64("random-seed", 0, "seed for the random number generator (default: time-based, non-deterministic)")
+	startDateStr := cmd.String("start-date", "", "report start date for the grouped trajectory report (YYYY-MM-DD); default: today")
 	var percentiles intList
 	cmd.Var(&percentiles, "percentile", "comma-separated percentiles to output (default: 50,75,85,95)")
 	var include stringList
@@ -678,6 +765,12 @@ func cmdDays(args []string) error {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}
 
+	for _, n := range items {
+		if n <= 0 {
+			return fmt.Errorf("-items: group sizes must be positive, got %d", n)
+		}
+	}
+
 	pool, err := loadPool(*dbFile, *exclusionsFile, include, startDate, endDate, *wholeTeam)
 	if err != nil {
 		return err
@@ -687,12 +780,25 @@ func cmdDays(args []string) error {
 	}
 	seed := resolveSeed(cmd, *randomSeed, now)
 
-	dist := simulateDaysToComplete(pool, mode, team, *engineers, *items, *simulations, *goroutines, seed)
-	fmt.Printf("%s, %d items -> how many days?\n", modeLabel(mode, team, *engineers), *items)
-
 	if len(percentiles) == 0 {
 		percentiles = intList{50, 75, 85, 95}
 	}
+
+	if len(items) > 1 {
+		startDate := now
+		if *startDateStr != "" {
+			startDate, err = parseDate(*startDateStr)
+			if err != nil {
+				return fmt.Errorf("invalid -start-date: %w", err)
+			}
+		}
+		printTrajectoryReport(pool, mode, team, *engineers, seed, *simulations, *goroutines, items, percentiles, startDate)
+		return nil
+	}
+
+	dist := simulateDaysToComplete(pool, mode, team, *engineers, items[0], *simulations, *goroutines, seed)
+	fmt.Printf("%s, %d items -> how many days?\n", modeLabel(mode, team, *engineers), items[0])
+
 	for _, p := range percentiles {
 		fmt.Printf("  %dth percentile: %d days\n", p, Percentile(dist, float64(p)))
 	}
