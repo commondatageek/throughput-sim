@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"sort"
 	"time"
 
 	"forecasting/internal/linear"
@@ -253,6 +254,11 @@ func newManifest(in manifestInputs) *Manifest {
 			UpdatedAt:   issueTime(it.UpdatedAt),
 		})
 	}
+	// Sort by identifier so two manifests' issue lists diff cleanly regardless
+	// of the DB query's row order.
+	sort.Slice(records, func(i, j int) bool {
+		return records[i].Identifier < records[j].Identifier
+	})
 
 	wd, _ := os.Getwd()
 
