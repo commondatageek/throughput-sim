@@ -463,7 +463,8 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "Commands:\n")
 	fmt.Fprintf(os.Stderr, "  items        How many items can N engineers complete in D days?\n")
 	fmt.Fprintf(os.Stderr, "  days         How many days for N engineers to complete I items?\n")
-	fmt.Fprintf(os.Stderr, "  probability  What is the probability of completing I items in D days?\n\n")
+	fmt.Fprintf(os.Stderr, "  probability  What is the probability of completing I items in D days?\n")
+	fmt.Fprintf(os.Stderr, "  backtest     Replay probability forecasts day-by-day for a project/milestone.\n\n")
 	fmt.Fprintf(os.Stderr, "Run 'sim <command> -help' for command-specific flags.\n")
 }
 
@@ -998,6 +999,8 @@ func main() {
 		err = cmdDays(os.Args[2:])
 	case "probability":
 		err = cmdProbability(os.Args[2:])
+	case "backtest":
+		err = cmdBacktest(os.Args[2:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %q\n\n", os.Args[1])
 		usage()
