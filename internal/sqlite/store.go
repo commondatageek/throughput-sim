@@ -184,7 +184,7 @@ func (s *Store) DistinctTeamKeys(ctx context.Context) ([]string, error) {
 //
 // Returned issues have Identifier, Title, Assignee, Team, ProjectName,
 // StateType, StartedAt, CompletedAt, and UpdatedAt populated.
-func (s *Store) CompletedBetween(ctx context.Context, start, end time.Time, assignees []string) ([]linear.Issue, error) {
+func (s *Store) CompletedBetween(ctx context.Context, start, end time.Time, assignees []string, teamKeys []string) ([]linear.Issue, error) {
 	q := `
 SELECT identifier, title, assignee, team_name, project_name, state_type,
        started_at, completed_at, updated_at
@@ -207,6 +207,18 @@ WHERE state_type = 'completed'
 			args = append(args, a)
 		}
 		q += " AND assignee IN (" + string(placeholders) + ")"
+	}
+
+	if len(teamKeys) > 0 {
+		placeholders := make([]byte, 0, len(teamKeys)*2)
+		for i, k := range teamKeys {
+			if i > 0 {
+				placeholders = append(placeholders, ',')
+			}
+			placeholders = append(placeholders, '?')
+			args = append(args, k)
+		}
+		q += " AND team_key IN (" + string(placeholders) + ")"
 	}
 
 	rows, err := s.db.QueryContext(ctx, q, args...)
@@ -245,15 +257,28 @@ WHERE state_type = 'completed'
 
 // InProgress returns issues whose state_type is 'started' and that have a
 // non-NULL started_at. Results are ordered by started_at ascending.
-func (s *Store) InProgress(ctx context.Context) ([]linear.Issue, error) {
-	const q = `
+func (s *Store) InProgress(ctx context.Context, teamKeys []string) ([]linear.Issue, error) {
+	q := `
 SELECT identifier, title, assignee, team_name, project_name, state_type, state_name, started_at
 FROM issues
 WHERE state_type = 'started'
-  AND started_at IS NOT NULL
-ORDER BY started_at ASC`
+  AND started_at IS NOT NULL`
 
-	rows, err := s.db.QueryContext(ctx, q)
+	var args []any
+	if len(teamKeys) > 0 {
+		placeholders := make([]byte, 0, len(teamKeys)*2)
+		for i, k := range teamKeys {
+			if i > 0 {
+				placeholders = append(placeholders, ',')
+			}
+			placeholders = append(placeholders, '?')
+			args = append(args, k)
+		}
+		q += " AND team_key IN (" + string(placeholders) + ")"
+	}
+	q += "\nORDER BY started_at ASC"
+
+	rows, err := s.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("InProgress: %w", err)
 	}

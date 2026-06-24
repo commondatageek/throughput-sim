@@ -14,6 +14,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"forecasting/internal/linear"
 	"forecasting/internal/sqlite"
 )
 
@@ -126,14 +127,14 @@ func formatState(name, typ string) string {
 }
 
 // loadFromDB reads cycle times and in-progress items from the SQLite store.
-func loadFromDB(dbPath string, sampleStart, sampleEnd time.Time, minCycleTime time.Duration, today time.Time) (cycleTimes []float64, inProgress []reportItem, err error) {
+func loadFromDB(dbPath string, sampleStart, sampleEnd time.Time, minCycleTime time.Duration, today time.Time, teamKeys []string) (cycleTimes []float64, inProgress []reportItem, err error) {
 	store, err := sqlite.Open(dbPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("open db: %w", err)
 	}
 	defer store.Close()
 
-	completed, err := store.CompletedBetween(context.Background(), sampleStart, sampleEnd, nil)
+	completed, err := store.CompletedBetween(context.Background(), sampleStart, sampleEnd, nil, teamKeys)
 	if err != nil {
 		return nil, nil, fmt.Errorf("query completed: %w", err)
 	}
@@ -151,7 +152,7 @@ func loadFromDB(dbPath string, sampleStart, sampleEnd time.Time, minCycleTime ti
 		}
 	}
 
-	active, err := store.InProgress(context.Background())
+	active, err := store.InProgress(context.Background(), teamKeys)
 	if err != nil {
 		return nil, nil, fmt.Errorf("query in-progress: %w", err)
 	}
@@ -181,6 +182,8 @@ func main() {
 	sampleEndStr := flag.String("sample-end", "", "End of completed-issue window (YYYY-MM-DD, default: today)")
 	format := flag.String("format", "text", "Output format: text, json, html")
 	minCycleTimeStr := flag.String("min-cycle-time", "", "Exclude completed issues with cycle time below this duration from the percentile distribution (e.g. 5m, 1h, 1d)")
+	var teams linear.KeyList
+	flag.Var(&teams, "teams", "Comma-separated team keys to filter by (e.g. DATA,PLT); default: all teams")
 	flag.Parse()
 
 	var minCycleTime time.Duration
@@ -220,7 +223,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	cycleTimes, inProgress, err := loadFromDB(*dbFile, sampleStart, sampleEnd, minCycleTime, today)
+	cycleTimes, inProgress, err := loadFromDB(*dbFile, sampleStart, sampleEnd, minCycleTime, today, teams)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)

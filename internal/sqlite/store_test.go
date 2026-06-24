@@ -55,7 +55,7 @@ func TestUpsertAndCompletedBetween(t *testing.T) {
 
 	start := mustParse(t, "2024-01-01T00:00:00Z")
 	end := mustParse(t, "2024-01-10T00:00:00Z")
-	got, err := store.CompletedBetween(ctx, start, end, nil)
+	got, err := store.CompletedBetween(ctx, start, end, nil, nil)
 	if err != nil {
 		t.Fatalf("CompletedBetween: %v", err)
 	}
@@ -180,7 +180,7 @@ func TestCompletedBetweenExcludesUnassigned(t *testing.T) {
 
 	start := mustParse(t, "2024-01-01T00:00:00Z")
 	end := mustParse(t, "2024-01-10T00:00:00Z")
-	got, err := store.CompletedBetween(ctx, start, end, nil)
+	got, err := store.CompletedBetween(ctx, start, end, nil, nil)
 	if err != nil {
 		t.Fatalf("CompletedBetween: %v", err)
 	}
@@ -206,7 +206,7 @@ func TestCompletedBetweenExcludesEmptyAssignee(t *testing.T) {
 
 	start := mustParse(t, "2024-01-01T00:00:00Z")
 	end := mustParse(t, "2024-01-10T00:00:00Z")
-	got, err := store.CompletedBetween(ctx, start, end, nil)
+	got, err := store.CompletedBetween(ctx, start, end, nil, nil)
 	if err != nil {
 		t.Fatalf("CompletedBetween: %v", err)
 	}
@@ -239,7 +239,7 @@ func TestCompletedBetweenBoundary(t *testing.T) {
 
 	start := mustParse(t, "2024-01-05T00:00:00Z")
 	end := mustParse(t, "2024-01-10T00:00:00Z")
-	got, err := store.CompletedBetween(ctx, start, end, nil)
+	got, err := store.CompletedBetween(ctx, start, end, nil, nil)
 	if err != nil {
 		t.Fatalf("CompletedBetween: %v", err)
 	}
@@ -270,7 +270,7 @@ func TestCompletedBetweenAssigneeFilter(t *testing.T) {
 
 	start := mustParse(t, "2024-01-01T00:00:00Z")
 	end := mustParse(t, "2024-01-10T00:00:00Z")
-	got, err := store.CompletedBetween(ctx, start, end, []string{"alice"})
+	got, err := store.CompletedBetween(ctx, start, end, []string{"alice"}, nil)
 	if err != nil {
 		t.Fatalf("CompletedBetween: %v", err)
 	}
@@ -303,7 +303,7 @@ func TestInProgress(t *testing.T) {
 		t.Fatalf("Upsert: %v", err)
 	}
 
-	got, err := store.InProgress(ctx)
+	got, err := store.InProgress(ctx, nil)
 	if err != nil {
 		t.Fatalf("InProgress: %v", err)
 	}
@@ -405,7 +405,7 @@ func TestUpsertNullTimeRoundTrip(t *testing.T) {
 		t.Fatalf("Upsert: %v", err)
 	}
 
-	got, err := store.InProgress(ctx)
+	got, err := store.InProgress(ctx, nil)
 	if err != nil {
 		t.Fatalf("InProgress: %v", err)
 	}
@@ -443,7 +443,7 @@ func TestUpsertStoresAbsentOptionalFieldsAsNull(t *testing.T) {
 	}
 
 	// Round-trips back to empty strings on the Go side.
-	got, err := store.InProgress(ctx)
+	got, err := store.InProgress(ctx, nil)
 	if err != nil {
 		t.Fatalf("InProgress: %v", err)
 	}

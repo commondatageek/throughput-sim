@@ -528,7 +528,7 @@ func loadPool(dbPath, exclusionsFile string, includeEngineers []string, startDat
 	}
 	defer store.Close()
 
-	issues, err := store.CompletedBetween(context.Background(), startDate, endDate, includeEngineers)
+	issues, err := store.CompletedBetween(context.Background(), startDate, endDate, includeEngineers, nil)
 	if err != nil {
 		return poolData{}, fmt.Errorf("querying db: %w", err)
 	}
