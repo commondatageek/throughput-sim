@@ -726,7 +726,7 @@ func computeTrajectoryTable(dists [][]int, percentiles []int) (cells [][]traject
 // -items g1,g2,...`: one row per group plus a Total row, with per-percentile
 // Days/Date columns. All thresholds are simulated with the same seed (see
 // computeTrajectoryTable) so the report's invariants hold.
-func printTrajectoryReport(pool *SamplePool, mode samplingMode, team []string, engineers int, seed int64, simulations, goroutines int, groups, percentiles []int, startDate time.Time) {
+func printTrajectoryReport(pool *SamplePool, mode samplingMode, team []string, engineers int, seed int64, simulations, goroutines int, groups, percentiles []int, targetStartDate time.Time) {
 	cum := make([]int, len(groups))
 	total := 0
 	for g, n := range groups {
@@ -740,7 +740,7 @@ func printTrajectoryReport(pool *SamplePool, mode samplingMode, team []string, e
 	}
 	cells, totals := computeTrajectoryTable(dists, percentiles)
 
-	fmt.Printf("%s, starting %s -> grouped trajectory\n\n", modeLabel(mode, team, engineers), startDate.Format("2006-01-02"))
+	fmt.Printf("%s, starting %s -> grouped trajectory\n\n", modeLabel(mode, team, engineers), targetStartDate.Format("2006-01-02"))
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	header := []string{"Group", "Items"}
@@ -753,8 +753,8 @@ func printTrajectoryReport(pool *SamplePool, mode samplingMode, team []string, e
 		row := []string{fmt.Sprintf("Group %d", g+1), fmt.Sprintf("%d", cum[g])}
 		for pi := range percentiles {
 			cell := cells[g][pi]
-			date := startDate.AddDate(0, 0, cell.CumulativeDays)
-			row = append(row, fmt.Sprintf("%d", cell.MarginalDays), date.Format("2006-01-02"))
+			date := targetStartDate.AddDate(0, 0, cell.CumulativeDays)
+			row = append(row, fmt.Sprintf("%d", cell.MarginalDays), date.Format("2006-01-02 (Mon)"))
 		}
 		fmt.Fprintln(w, strings.Join(row, "\t"))
 	}
@@ -762,8 +762,8 @@ func printTrajectoryReport(pool *SamplePool, mode samplingMode, team []string, e
 	totalRow := []string{"Total", fmt.Sprintf("%d", total)}
 	for pi := range percentiles {
 		days := totals[pi]
-		date := startDate.AddDate(0, 0, days)
-		totalRow = append(totalRow, fmt.Sprintf("%d", days), date.Format("2006-01-02"))
+		date := targetStartDate.AddDate(0, 0, days)
+		totalRow = append(totalRow, fmt.Sprintf("%d", days), date.Format("2006-01-02 (Mon)"))
 	}
 	fmt.Fprintln(w, strings.Join(totalRow, "\t"))
 
@@ -784,7 +784,7 @@ func cmdDays(args []string) error {
 	sampleStart := cmd.String("sample-start", defaultSampleStart, "sample data start date (YYYY-MM-DD)")
 	sampleEnd := cmd.String("sample-end", defaultSampleEnd, "sample data end date (YYYY-MM-DD)")
 	randomSeed := cmd.Int64("random-seed", 0, "seed for the random number generator (default: time-based, non-deterministic)")
-	startDateStr := cmd.String("start-date", "", "report start date for the grouped trajectory report (YYYY-MM-DD); default: today")
+	targetStartStr := cmd.String("target-start-date", "today", "forecast start date used to compute calendar dates (YYYY-MM-DD, or: today, tomorrow)")
 	var percentiles intList
 	cmd.Var(&percentiles, "percentile", "comma-separated percentiles to output (default: 50,75,85,95)")
 	var include stringList
@@ -825,6 +825,11 @@ func cmdDays(args []string) error {
 	}
 	seed := resolveSeed(cmd, *randomSeed, now)
 
+	targetStartDate, err := resolveRelativeDate(*targetStartStr, now)
+	if err != nil {
+		return fmt.Errorf("invalid -target-start-date: %w", err)
+	}
+
 	if len(percentiles) == 0 {
 		percentiles = intList{50, 75, 85, 95}
 	}
@@ -841,14 +846,7 @@ func cmdDays(args []string) error {
 	}
 
 	if len(items) > 1 {
-		startDate := now
-		if *startDateStr != "" {
-			startDate, err = parseDate(*startDateStr)
-			if err != nil {
-				return fmt.Errorf("invalid -start-date: %w", err)
-			}
-		}
-		printTrajectoryReport(pool, mode, team, *engineers, seed, *simulations, *goroutines, items, percentiles, startDate)
+		printTrajectoryReport(pool, mode, team, *engineers, seed, *simulations, *goroutines, items, percentiles, targetStartDate)
 		return nil
 	}
 
@@ -856,7 +854,9 @@ func cmdDays(args []string) error {
 	fmt.Printf("%s, %d items -> how many days?\n", modeLabel(mode, team, *engineers), items[0])
 
 	for _, p := range percentiles {
-		fmt.Printf("  %dth percentile: %d days\n", p, Percentile(dist, float64(p)))
+		days := Percentile(dist, float64(p))
+		date := targetStartDate.AddDate(0, 0, days)
+		fmt.Printf("  %dth percentile: %d days (%s)\n", p, days, date.Format("2006-01-02 (Mon)"))
 	}
 	return nil
 }
