@@ -440,7 +440,7 @@ GROUP BY team_key, team_name, project_name`
 func (s *Store) ProjectMilestoneIssues(ctx context.Context, projectName, milestoneName string) ([]linear.Issue, error) {
 	q := `
 SELECT identifier, title, assignee, project_name, project_milestone_name,
-       state_type, created_at, completed_at
+       state_type, created_at, started_at, completed_at
 FROM issues
 WHERE project_name = ?
   AND state_type NOT IN ('canceled', 'duplicate')`
@@ -461,11 +461,11 @@ WHERE project_name = ?
 	for rows.Next() {
 		var it linear.Issue
 		var assignee, proj, milestone sql.NullString
-		var createdAt, completedAt sql.NullTime
+		var createdAt, startedAt, completedAt sql.NullTime
 		if err := rows.Scan(
 			&it.Identifier, &it.Title, &assignee,
 			&proj, &milestone, &it.StateType,
-			&createdAt, &completedAt,
+			&createdAt, &startedAt, &completedAt,
 		); err != nil {
 			return nil, fmt.Errorf("ProjectMilestoneIssues scan: %w", err)
 		}
@@ -474,6 +474,9 @@ WHERE project_name = ?
 		it.ProjectMilestoneName = milestone.String
 		if createdAt.Valid {
 			it.CreatedAt = createdAt.Time
+		}
+		if startedAt.Valid {
+			it.StartedAt = startedAt.Time
 		}
 		if completedAt.Valid {
 			it.CompletedAt = completedAt.Time

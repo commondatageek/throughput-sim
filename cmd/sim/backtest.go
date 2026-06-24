@@ -42,6 +42,21 @@ func countAsOf(issues []linear.Issue, d time.Time) (completed, remaining int) {
 	return
 }
 
+// earliestStartedAt returns the minimum non-zero StartedAt across all issues,
+// or the zero time if none have one.
+func earliestStartedAt(issues []linear.Issue) time.Time {
+	var earliest time.Time
+	for _, it := range issues {
+		if it.StartedAt.IsZero() {
+			continue
+		}
+		if earliest.IsZero() || it.StartedAt.Before(earliest) {
+			earliest = it.StartedAt
+		}
+	}
+	return earliest
+}
+
 // allCreatedBy reports whether every issue in the set had been created by d
 // (i.e. nothing is still waiting to enter the backlog).
 func allCreatedBy(issues []linear.Issue, d time.Time) bool {
@@ -60,7 +75,7 @@ func cmdBacktest(args []string) error {
 	exclusionsFile := cmd.String("exclusions", "exclusions.json", "path to exclusions JSON file")
 	project := cmd.String("project", "", "project name to backtest (required)")
 	milestone := cmd.String("milestone", "", "milestone name within the project (optional)")
-	startDateStr := cmd.String("start-date", "", "first day to backtest, inclusive (YYYY-MM-DD, required)")
+	startDateStr := cmd.String("start-date", "", "first day to backtest, inclusive (YYYY-MM-DD); default: earliest started_at in the issue set")
 	targetDateStr := cmd.String("target-date", "", "completion deadline to forecast against (YYYY-MM-DD, required)")
 	engineers := cmd.Int("engineers", 3, "number of (equivalent) engineers")
 	wholeTeam := cmd.Bool("whole-team", false, "use whole-team daily throughput from historical data (ignores -engineers)")
@@ -79,9 +94,6 @@ func cmdBacktest(args []string) error {
 	if *project == "" {
 		return fmt.Errorf("-project is required")
 	}
-	if *startDateStr == "" {
-		return fmt.Errorf("-start-date is required")
-	}
 	if *targetDateStr == "" {
 		return fmt.Errorf("-target-date is required")
 	}
@@ -89,16 +101,9 @@ func cmdBacktest(args []string) error {
 		return fmt.Errorf(`-format must be "text" or "csv"`)
 	}
 
-	startDate, err := parseDate(*startDateStr)
-	if err != nil {
-		return fmt.Errorf("invalid -start-date: %w", err)
-	}
 	targetDate, err := parseDate(*targetDateStr)
 	if err != nil {
 		return fmt.Errorf("invalid -target-date: %w", err)
-	}
-	if !targetDate.After(startDate) {
-		return fmt.Errorf("-target-date must be after -start-date")
 	}
 
 	now := time.Now().UTC()
@@ -144,6 +149,27 @@ func cmdBacktest(args []string) error {
 		return fmt.Errorf("no issues found for project %q — check spelling", *project)
 	}
 
+	// Resolve start date: explicit flag wins; otherwise infer from the earliest
+	// started_at across the issue set.
+	var startDate time.Time
+	if *startDateStr != "" {
+		startDate, err = parseDate(*startDateStr)
+		if err != nil {
+			return fmt.Errorf("invalid -start-date: %w", err)
+		}
+	} else {
+		startDate = earliestStartedAt(issues)
+		if startDate.IsZero() {
+			return fmt.Errorf("no started_at found in issue set; provide -start-date explicitly")
+		}
+		// Truncate to calendar day.
+		startDate = startDate.UTC().Truncate(24 * time.Hour)
+	}
+
+	if !targetDate.After(startDate) {
+		return fmt.Errorf("-target-date must be after -start-date (inferred: %s)", startDate.Format("2006-01-02"))
+	}
+
 	// Daily backtest loop.
 	var rows []backtestRow
 	for d := startDate; !d.After(targetDate); d = d.AddDate(0, 0, 1) {
@@ -173,14 +199,15 @@ func cmdBacktest(args []string) error {
 		if *milestone != "" {
 			scope += " / " + *milestone
 		}
-		printBacktestText(rows, scope, label, len(issues), sampleStartDate, sampleEndDate)
+		printBacktestText(rows, scope, label, len(issues), startDate, sampleStartDate, sampleEndDate)
 	}
 	return nil
 }
 
-func printBacktestText(rows []backtestRow, scope, label string, total int, sampleStart, sampleEnd time.Time) {
+func printBacktestText(rows []backtestRow, scope, label string, total int, startDate, sampleStart, sampleEnd time.Time) {
 	fmt.Printf("Backtest: %s (%d issues, %s)\n", scope, total, label)
-	fmt.Printf("Sample window: %s – %s\n\n", sampleStart.Format("2006-01-02"), sampleEnd.Format("2006-01-02"))
+	fmt.Printf("Start date: %s  Sample window: %s – %s\n\n",
+		startDate.Format("2006-01-02"), sampleStart.Format("2006-01-02"), sampleEnd.Format("2006-01-02"))
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "DATE\tCOMPLETED\tREMAINING\tPROB")
