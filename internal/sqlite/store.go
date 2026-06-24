@@ -433,6 +433,56 @@ GROUP BY team_key, team_name, project_name`
 	return acts, rows.Err()
 }
 
+// ProjectMilestoneIssues returns all non-canceled, non-duplicate issues for
+// the given project (optionally narrowed to one milestone within it). Completed
+// issues are included so the caller can evaluate membership "as of" a given
+// date using each issue's created_at and completed_at.
+func (s *Store) ProjectMilestoneIssues(ctx context.Context, projectName, milestoneName string) ([]linear.Issue, error) {
+	q := `
+SELECT identifier, title, assignee, project_name, project_milestone_name,
+       state_type, created_at, completed_at
+FROM issues
+WHERE project_name = ?
+  AND state_type NOT IN ('canceled', 'duplicate')`
+
+	args := []any{projectName}
+	if milestoneName != "" {
+		q += "\n  AND project_milestone_name = ?"
+		args = append(args, milestoneName)
+	}
+
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("ProjectMilestoneIssues: %w", err)
+	}
+	defer rows.Close()
+
+	var issues []linear.Issue
+	for rows.Next() {
+		var it linear.Issue
+		var assignee, proj, milestone sql.NullString
+		var createdAt, completedAt sql.NullTime
+		if err := rows.Scan(
+			&it.Identifier, &it.Title, &assignee,
+			&proj, &milestone, &it.StateType,
+			&createdAt, &completedAt,
+		); err != nil {
+			return nil, fmt.Errorf("ProjectMilestoneIssues scan: %w", err)
+		}
+		it.Assignee = assignee.String
+		it.ProjectName = proj.String
+		it.ProjectMilestoneName = milestone.String
+		if createdAt.Valid {
+			it.CreatedAt = createdAt.Time
+		}
+		if completedAt.Valid {
+			it.CompletedAt = completedAt.Time
+		}
+		issues = append(issues, it)
+	}
+	return issues, rows.Err()
+}
+
 // sqliteTimeLayouts are the timestamp formats modernc.org/sqlite may have
 // written DATETIME values in. The first matches how the driver binds a
 // time.Time; the rest are fallbacks.

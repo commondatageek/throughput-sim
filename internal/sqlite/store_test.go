@@ -417,6 +417,61 @@ func TestUpsertNullTimeRoundTrip(t *testing.T) {
 	}
 }
 
+func TestProjectMilestoneIssues(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+
+	issues := []linear.Issue{
+		{Identifier: "ENG-1", ProjectName: "Apollo", ProjectMilestoneName: "v1.0", StateType: "started",
+			CreatedAt: mustParse(t, "2024-01-01T00:00:00Z")},
+		{Identifier: "ENG-2", ProjectName: "Apollo", ProjectMilestoneName: "v1.0", StateType: "completed",
+			CreatedAt: mustParse(t, "2024-01-02T00:00:00Z"), CompletedAt: mustParse(t, "2024-01-10T00:00:00Z")},
+		{Identifier: "ENG-3", ProjectName: "Apollo", ProjectMilestoneName: "v1.0", StateType: "canceled"},
+		{Identifier: "ENG-4", ProjectName: "Apollo", ProjectMilestoneName: "v1.0", StateType: "duplicate"},
+		{Identifier: "ENG-5", ProjectName: "Apollo", ProjectMilestoneName: "v2.0", StateType: "started"},
+		{Identifier: "ENG-6", ProjectName: "Zeus", ProjectMilestoneName: "v1.0", StateType: "started"},
+	}
+	if err := store.Upsert(ctx, issues...); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+
+	// Project-only: all non-canceled/dup Apollo issues across both milestones.
+	got, err := store.ProjectMilestoneIssues(ctx, "Apollo", "")
+	if err != nil {
+		t.Fatalf("ProjectMilestoneIssues(Apollo, \"\"): %v", err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("project-only = %d issues, want 3: %+v", len(got), got)
+	}
+	for _, it := range got {
+		if it.StateType == "canceled" || it.StateType == "duplicate" {
+			t.Errorf("excluded state_type returned: %+v", it)
+		}
+		if it.ProjectName != "Apollo" {
+			t.Errorf("wrong project: %+v", it)
+		}
+	}
+
+	// Milestone-scoped: only v1.0, excludes canceled/dup.
+	gotMS, err := store.ProjectMilestoneIssues(ctx, "Apollo", "v1.0")
+	if err != nil {
+		t.Fatalf("ProjectMilestoneIssues(Apollo, v1.0): %v", err)
+	}
+	if len(gotMS) != 2 {
+		t.Fatalf("milestone filter = %d issues, want 2: %+v", len(gotMS), gotMS)
+	}
+	ids := []string{gotMS[0].Identifier, gotMS[1].Identifier}
+	if !slices.Contains(ids, "ENG-1") || !slices.Contains(ids, "ENG-2") {
+		t.Errorf("milestone filter ids = %v, want ENG-1 and ENG-2", ids)
+	}
+	// completed_at round-trips.
+	for _, it := range gotMS {
+		if it.Identifier == "ENG-2" && it.CompletedAt.IsZero() {
+			t.Errorf("ENG-2.CompletedAt is zero, want non-zero")
+		}
+	}
+}
+
 func TestUpsertStoresAbsentOptionalFieldsAsNull(t *testing.T) {
 	store := openTestStore(t)
 	ctx := context.Background()
