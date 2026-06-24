@@ -474,7 +474,8 @@ func parseDate(s string) (time.Time, error) {
 // resolveRelativeDate parses s as a calendar date, accepting YYYY-MM-DD or
 // the relative keywords today and tomorrow.
 func resolveRelativeDate(s string, now time.Time) (time.Time, error) {
-	today := now.UTC().Truncate(24 * time.Hour)
+	y, m, d := now.Local().Date()
+	today := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 	switch strings.ToLower(s) {
 	case "today":
 		return today, nil
