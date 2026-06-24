@@ -471,6 +471,20 @@ func parseDate(s string) (time.Time, error) {
 	return time.ParseInLocation("2006-01-02", s, time.UTC)
 }
 
+// resolveRelativeDate parses s as a calendar date, accepting YYYY-MM-DD or
+// the relative keywords today and tomorrow.
+func resolveRelativeDate(s string, now time.Time) (time.Time, error) {
+	today := now.UTC().Truncate(24 * time.Hour)
+	switch strings.ToLower(s) {
+	case "today":
+		return today, nil
+	case "tomorrow":
+		return today.AddDate(0, 0, 1), nil
+	default:
+		return parseDate(s)
+	}
+}
+
 // resolveEndDate returns the end of the sample window. If -sample-end was
 // explicitly passed, it's parsed as a calendar date (midnight, exclusive of
 // that whole day). Otherwise it defaults to the current moment, so that
@@ -852,7 +866,9 @@ func cmdProbability(args []string) error {
 	dbFile := cmd.String("db", "linear.db", "path to SQLite database")
 	exclusionsFile := cmd.String("exclusions", "exclusions.json", "path to exclusions JSON file")
 	engineers := cmd.Int("engineers", 3, "number of (equivalent) engineers")
-	days := cmd.Int("days", 30, "number of days")
+	days := cmd.Int("days", 0, "number of days; mutually exclusive with -target-end-date, one must be given")
+	targetStartStr := cmd.String("target-start-date", "tomorrow", `start of the target window (YYYY-MM-DD, or: today, tomorrow); default: tomorrow`)
+	targetEndStr := cmd.String("target-end-date", "", "end of the target window (YYYY-MM-DD, or: today, tomorrow); mutually exclusive with -days, one must be given")
 	items := cmd.Int("items", -1, "number of items to complete (omit to show full distribution)")
 	wholeTeam := cmd.Bool("whole-team", false, "use whole-team daily throughput from historical data (ignores -engineers)")
 	simulations := cmd.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
@@ -872,6 +888,15 @@ func cmdProbability(args []string) error {
 		return err
 	}
 
+	daysSet := isFlagSet(cmd, "days")
+	targetEndSet := isFlagSet(cmd, "target-end-date")
+	if daysSet && targetEndSet {
+		return fmt.Errorf("-days and -target-end-date are mutually exclusive")
+	}
+	if !daysSet && !targetEndSet {
+		return fmt.Errorf("one of -days or -target-end-date must be provided")
+	}
+
 	startDate, err := parseDate(*sampleStart)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start date: %w", err)
@@ -880,6 +905,23 @@ func cmdProbability(args []string) error {
 	endDate, err := resolveEndDate(cmd, *sampleEnd, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
+	}
+
+	effectiveDays := *days
+	var targetStart, targetEnd time.Time
+	if targetEndSet {
+		targetStart, err = resolveRelativeDate(*targetStartStr, now)
+		if err != nil {
+			return fmt.Errorf("invalid -target-start-date: %w", err)
+		}
+		targetEnd, err = resolveRelativeDate(*targetEndStr, now)
+		if err != nil {
+			return fmt.Errorf("invalid -target-end-date: %w", err)
+		}
+		if !targetEnd.After(targetStart) {
+			return fmt.Errorf("-target-end-date must be after -target-start-date")
+		}
+		effectiveDays = int(targetEnd.Sub(targetStart).Hours()/24) + 1
 	}
 
 	loaded, err := loadPool(*dbFile, *exclusionsFile, include, startDate, endDate, *wholeTeam)
@@ -892,24 +934,38 @@ func cmdProbability(args []string) error {
 	}
 	seed := resolveSeed(cmd, *randomSeed, now)
 
+	manifestExtra := map[string]any{}
+	if targetEndSet {
+		manifestExtra["target_start_date"] = targetStart.Format("2006-01-02")
+		manifestExtra["target_end_date"] = targetEnd.Format("2006-01-02")
+		manifestExtra["effective_days"] = effectiveDays
+	}
 	if err := writeManifest(*manifestFile, manifestInputs{
 		Subcommand: "probability", Cmd: cmd, Mode: mode, Team: team, Include: include,
 		Engineers: *engineers, WholeTeam: *wholeTeam, Seed: seed,
 		SampleStart: startDate, SampleEnd: endDate,
 		DBPath: *dbFile, ExclusionsPath: *exclusionsFile,
 		Exclusions: loaded.Exclusions, Pool: pool, Issues: loaded.Issues, Skipped: loaded.Skipped,
+		Extra: manifestExtra,
 	}); err != nil {
 		return err
 	}
 
-	dist := simulateItemsInDays(pool, mode, team, *engineers, *days, *simulations, *goroutines, seed)
+	dist := simulateItemsInDays(pool, mode, team, *engineers, effectiveDays, *simulations, *goroutines, seed)
 	modeDescription := modeLabel(mode, team, *engineers)
 
+	var windowDescription string
+	if targetEndSet {
+		windowDescription = fmt.Sprintf("%s to %s (%d days)", targetStart.Format("2006-01-02"), targetEnd.Format("2006-01-02"), effectiveDays)
+	} else {
+		windowDescription = fmt.Sprintf("%d days", effectiveDays)
+	}
+
 	if *items >= 0 {
-		fmt.Printf("%s, %d days, %d items -> probability of completion?\n", modeDescription, *days, *items)
+		fmt.Printf("%s, %s, %d items -> probability of completion?\n", modeDescription, windowDescription, *items)
 		fmt.Printf("  %.1f%%\n", probabilityAtLeast(dist, *items))
 	} else {
-		fmt.Printf("%s, %d days -> probability of completing N items\n", modeDescription, *days)
+		fmt.Printf("%s, %s -> probability of completing N items\n", modeDescription, windowDescription)
 		for n := 1; ; n++ {
 			p := probabilityAtLeast(dist, n)
 			fmt.Printf("  %d items: %.1f%%\n", n, p)
