@@ -743,10 +743,13 @@ func printTrajectoryReport(pool *SamplePool, mode samplingMode, team []string, e
 	fmt.Printf("%s, starting %s -> grouped trajectory\n\n", modeLabel(mode, team, engineers), targetStartDate.Format("2006-01-02"))
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	pctRow := []string{"", ""}
 	header := []string{"Group", "Items"}
 	for _, p := range percentiles {
-		header = append(header, fmt.Sprintf("p%d Days", p), fmt.Sprintf("p%d Date", p))
+		pctRow = append(pctRow, fmt.Sprintf("p%d", p), "")
+		header = append(header, "Days", "Date")
 	}
+	fmt.Fprintln(w, strings.Join(pctRow, "\t"))
 	fmt.Fprintln(w, strings.Join(header, "\t"))
 
 	for g := range groups {
