@@ -60,10 +60,10 @@ func (s *Store) Upsert(ctx context.Context, issues ...linear.Issue) error {
 INSERT INTO issues
     (identifier, title, assignee, team_key, team_name, project_id, project_name,
      project_milestone_id, project_milestone_name, state_type, state_name,
-     created_at, started_at, completed_at, archived_at, auto_archived_at,
+     created_at, started_at, completed_at, canceled_at, archived_at, auto_archived_at,
      added_to_project_at, updated_at)
 VALUES
-    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(identifier) DO UPDATE SET
     title                  = excluded.title,
     assignee               = excluded.assignee,
@@ -78,6 +78,7 @@ ON CONFLICT(identifier) DO UPDATE SET
     created_at             = excluded.created_at,
     started_at             = excluded.started_at,
     completed_at           = excluded.completed_at,
+    canceled_at            = excluded.canceled_at,
     archived_at            = excluded.archived_at,
     auto_archived_at       = excluded.auto_archived_at,
     added_to_project_at    = excluded.added_to_project_at,
@@ -111,6 +112,7 @@ ON CONFLICT(identifier) DO UPDATE SET
 			nullTime(it.CreatedAt),
 			nullTime(it.StartedAt),
 			nullTime(it.CompletedAt),
+			nullTime(it.CanceledAt),
 			nullTime(it.ArchivedAt),
 			nullTime(it.AutoArchivedAt),
 			nullTime(it.AddedToProjectAt),
@@ -484,6 +486,69 @@ WHERE project_name = ?
 		issues = append(issues, it)
 	}
 	return issues, rows.Err()
+}
+
+// CFDRow holds the timestamp columns needed to build a Cumulative Flow Diagram.
+// Only the fields populated by CFDIssues are guaranteed to be set.
+type CFDRow struct {
+	CreatedAt   time.Time
+	StartedAt   time.Time
+	CompletedAt time.Time
+	CanceledAt  time.Time
+	StateType   string
+}
+
+// CFDIssues returns one CFDRow per issue (all issues, no state filter) so the
+// caller can build cumulative arrival curves. If teamKeys is non-empty, only
+// those teams are included. Rows are ordered by created_at ascending.
+func (s *Store) CFDIssues(ctx context.Context, teamKeys []string) ([]CFDRow, error) {
+	q := `
+SELECT created_at, started_at, completed_at, canceled_at, state_type
+FROM issues`
+
+	var args []any
+	if len(teamKeys) > 0 {
+		placeholders := make([]byte, 0, len(teamKeys)*2)
+		for i, k := range teamKeys {
+			if i > 0 {
+				placeholders = append(placeholders, ',')
+			}
+			placeholders = append(placeholders, '?')
+			args = append(args, k)
+		}
+		q += " WHERE team_key IN (" + string(placeholders) + ")"
+	}
+	q += "\nORDER BY created_at ASC"
+
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("CFDIssues: %w", err)
+	}
+	defer rows.Close()
+
+	var out []CFDRow
+	for rows.Next() {
+		var createdAt, startedAt, completedAt, canceledAt sql.NullTime
+		var stateType string
+		if err := rows.Scan(&createdAt, &startedAt, &completedAt, &canceledAt, &stateType); err != nil {
+			return nil, fmt.Errorf("CFDIssues scan: %w", err)
+		}
+		row := CFDRow{StateType: stateType}
+		if createdAt.Valid {
+			row.CreatedAt = createdAt.Time
+		}
+		if startedAt.Valid {
+			row.StartedAt = startedAt.Time
+		}
+		if completedAt.Valid {
+			row.CompletedAt = completedAt.Time
+		}
+		if canceledAt.Valid {
+			row.CanceledAt = canceledAt.Time
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
 }
 
 // sqliteTimeLayouts are the timestamp formats modernc.org/sqlite may have

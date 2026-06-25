@@ -207,6 +207,7 @@ func toIssue(n issueNode) Issue {
 		CreatedAt:            n.CreatedAt,
 		StartedAt:            n.StartedAt,
 		CompletedAt:          n.CompletedAt,
+		CanceledAt:           n.CanceledAt,
 		ArchivedAt:           n.ArchivedAt,
 		AutoArchivedAt:       n.AutoArchivedAt,
 		AddedToProjectAt:     n.AddedToProjectAt,
@@ -248,6 +249,7 @@ query FetchIssues($after: String) {
       createdAt
       startedAt
       completedAt
+      canceledAt
       updatedAt
       archivedAt
       autoArchivedAt
@@ -299,6 +301,7 @@ type issueNode struct {
 	CreatedAt        time.Time     `json:"createdAt"`
 	StartedAt        time.Time     `json:"startedAt"`
 	CompletedAt      time.Time     `json:"completedAt"`
+	CanceledAt       time.Time     `json:"canceledAt"`
 	UpdatedAt        time.Time     `json:"updatedAt"`
 	ArchivedAt       time.Time     `json:"archivedAt"`
 	AutoArchivedAt   time.Time     `json:"autoArchivedAt"`

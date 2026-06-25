@@ -17,6 +17,7 @@ CREATE TABLE issues (
     created_at              DATETIME,
     started_at              DATETIME,
     completed_at            DATETIME,
+    canceled_at             DATETIME,
     archived_at             DATETIME,
     auto_archived_at        DATETIME,
     added_to_project_at     DATETIME,

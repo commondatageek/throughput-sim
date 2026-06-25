@@ -18,6 +18,7 @@ type Issue struct {
 	CreatedAt            time.Time
 	StartedAt            time.Time
 	CompletedAt          time.Time
+	CanceledAt           time.Time
 	ArchivedAt           time.Time
 	AutoArchivedAt       time.Time
 	AddedToProjectAt     time.Time

@@ -29,6 +29,7 @@ func TestToIssueFullyPopulated(t *testing.T) {
 	createdAt := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	startedAt := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)
 	completedAt := time.Date(2024, 1, 10, 0, 0, 0, 0, time.UTC)
+	canceledAt := time.Date(2024, 1, 9, 0, 0, 0, 0, time.UTC)
 	updatedAt := time.Date(2024, 1, 10, 0, 0, 0, 0, time.UTC)
 	archivedAt := time.Date(2024, 1, 11, 0, 0, 0, 0, time.UTC)
 	autoArchivedAt := time.Date(2024, 1, 12, 0, 0, 0, 0, time.UTC)
@@ -40,6 +41,7 @@ func TestToIssueFullyPopulated(t *testing.T) {
 		CreatedAt:        createdAt,
 		StartedAt:        startedAt,
 		CompletedAt:      completedAt,
+		CanceledAt:       canceledAt,
 		UpdatedAt:        updatedAt,
 		ArchivedAt:       archivedAt,
 		AutoArchivedAt:   autoArchivedAt,
@@ -68,6 +70,7 @@ func TestToIssueFullyPopulated(t *testing.T) {
 		CreatedAt:            createdAt,
 		StartedAt:            startedAt,
 		CompletedAt:          completedAt,
+		CanceledAt:           canceledAt,
 		ArchivedAt:           archivedAt,
 		AutoArchivedAt:       autoArchivedAt,
 		AddedToProjectAt:     addedToProjectAt,
