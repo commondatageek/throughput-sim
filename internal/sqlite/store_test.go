@@ -472,6 +472,83 @@ func TestProjectMilestoneIssues(t *testing.T) {
 	}
 }
 
+func TestCFDIssues(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+
+	day := func(s string) time.Time { return mustParse(t, s+"T00:00:00Z") }
+
+	issues := []linear.Issue{
+		// Normal completed issue: created → started → completed.
+		{Identifier: "ENG-1", TeamKey: "ENG", StateType: "completed",
+			CreatedAt: day("2024-01-01"), StartedAt: day("2024-01-03"), CompletedAt: day("2024-01-08")},
+		// Canceled after starting.
+		{Identifier: "ENG-2", TeamKey: "ENG", StateType: "canceled",
+			CreatedAt: day("2024-01-02"), StartedAt: day("2024-01-04"), CanceledAt: day("2024-01-07")},
+		// Canceled from backlog (no started_at).
+		{Identifier: "ENG-3", TeamKey: "ENG", StateType: "canceled",
+			CreatedAt: day("2024-01-03"), CanceledAt: day("2024-01-06")},
+		// Still active (no exit timestamp).
+		{Identifier: "ENG-4", TeamKey: "ENG", StateType: "started",
+			CreatedAt: day("2024-01-04"), StartedAt: day("2024-01-05")},
+		// Different team — excluded when filtering.
+		{Identifier: "DATA-1", TeamKey: "DATA", StateType: "completed",
+			CreatedAt: day("2024-01-01"), CompletedAt: day("2024-01-05")},
+	}
+	if err := store.Upsert(ctx, issues...); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+
+	// All teams: 5 rows.
+	all, err := store.CFDIssues(ctx, nil)
+	if err != nil {
+		t.Fatalf("CFDIssues(nil): %v", err)
+	}
+	if len(all) != 5 {
+		t.Fatalf("CFDIssues(nil) = %d rows, want 5", len(all))
+	}
+
+	// Team filter: 4 ENG rows, DATA excluded.
+	eng, err := store.CFDIssues(ctx, []string{"ENG"})
+	if err != nil {
+		t.Fatalf("CFDIssues(ENG): %v", err)
+	}
+	if len(eng) != 4 {
+		t.Fatalf("CFDIssues(ENG) = %d rows, want 4", len(eng))
+	}
+
+	// Spot-check timestamps round-trip correctly.
+	byID := make(map[string]CFDRow)
+	for _, r := range eng {
+		// Identify by CreatedAt (unique in our fixture).
+		for _, orig := range issues {
+			if orig.TeamKey == "ENG" && orig.CreatedAt.Equal(r.CreatedAt) {
+				byID[orig.Identifier] = r
+			}
+		}
+	}
+
+	eng1 := byID["ENG-1"]
+	if !eng1.CompletedAt.Equal(day("2024-01-08")) {
+		t.Errorf("ENG-1 CompletedAt = %v, want 2024-01-08", eng1.CompletedAt)
+	}
+	eng2 := byID["ENG-2"]
+	if !eng2.CanceledAt.Equal(day("2024-01-07")) {
+		t.Errorf("ENG-2 CanceledAt = %v, want 2024-01-07", eng2.CanceledAt)
+	}
+	eng3 := byID["ENG-3"]
+	if !eng3.StartedAt.IsZero() {
+		t.Errorf("ENG-3 StartedAt = %v, want zero (canceled from backlog)", eng3.StartedAt)
+	}
+	if !eng3.CanceledAt.Equal(day("2024-01-06")) {
+		t.Errorf("ENG-3 CanceledAt = %v, want 2024-01-06", eng3.CanceledAt)
+	}
+	eng4 := byID["ENG-4"]
+	if !eng4.CompletedAt.IsZero() || !eng4.CanceledAt.IsZero() {
+		t.Errorf("ENG-4 should have no exit timestamps: CompletedAt=%v CanceledAt=%v", eng4.CompletedAt, eng4.CanceledAt)
+	}
+}
+
 func TestUpsertStoresAbsentOptionalFieldsAsNull(t *testing.T) {
 	store := openTestStore(t)
 	ctx := context.Background()

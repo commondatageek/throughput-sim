@@ -5,6 +5,7 @@ tasks:
     desc: Build all Go commands to bin/
     cmds:
       - go build -C cmd/aging-report -o ../../bin/aging-report .
+      - go build -C cmd/cfd -o ../../bin/cfd .
       - go build -C cmd/count-issues -o ../../bin/count-issues .
       - go build -C cmd/list-teams -o ../../bin/list-teams .
       - go build -C cmd/sim -o ../../bin/sim .
