@@ -16,6 +16,7 @@ import (
 
 	"forecasting/internal/linear"
 	"forecasting/internal/sqlite"
+	"forecasting/internal/util"
 )
 
 type reportItem struct {
@@ -28,10 +29,6 @@ type reportItem struct {
 	StartedAt   time.Time
 	AgeDays     float64
 	Percentile  int
-}
-
-func parseDate(s string) (time.Time, error) {
-	return time.ParseInLocation("2006-01-02", s, time.UTC)
 }
 
 var durationTermRe = regexp.MustCompile(`^([0-9]*\.?[0-9]+)([a-zµ]+)`)
@@ -205,7 +202,7 @@ func main() {
 
 	sampleEnd := today
 	if *sampleEndStr != "" {
-		t, err := parseDate(*sampleEndStr)
+		t, err := util.ParseDate(*sampleEndStr)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: invalid -sample-end %q: %v\n", *sampleEndStr, err)
 			os.Exit(1)
@@ -215,7 +212,7 @@ func main() {
 
 	sampleStart := today.AddDate(0, -3, 0)
 	if *sampleStartStr != "" {
-		t, err := parseDate(*sampleStartStr)
+		t, err := util.ParseDate(*sampleStartStr)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: invalid -sample-start %q: %v\n", *sampleStartStr, err)
 			os.Exit(1)

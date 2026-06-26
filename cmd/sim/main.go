@@ -18,6 +18,7 @@ import (
 
 	"forecasting/internal/linear"
 	"forecasting/internal/sqlite"
+	"forecasting/internal/util"
 
 	"github.com/mattn/go-isatty"
 )
@@ -468,10 +469,6 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "Run 'sim <command> -help' for command-specific flags.\n")
 }
 
-func parseDate(s string) (time.Time, error) {
-	return time.ParseInLocation("2006-01-02", s, time.UTC)
-}
-
 // resolveRelativeDate parses s as a calendar date, accepting YYYY-MM-DD or
 // the relative keywords today and tomorrow.
 func resolveRelativeDate(s string, now time.Time) (time.Time, error) {
@@ -483,7 +480,7 @@ func resolveRelativeDate(s string, now time.Time) (time.Time, error) {
 	case "tomorrow":
 		return today.AddDate(0, 0, 1), nil
 	default:
-		return parseDate(s)
+		return util.ParseDate(s)
 	}
 }
 
@@ -496,7 +493,7 @@ func resolveEndDate(cmd *flag.FlagSet, sampleEnd string, now time.Time) (time.Ti
 	if !isFlagSet(cmd, "sample-end") {
 		return now, nil
 	}
-	return parseDate(sampleEnd)
+	return util.ParseDate(sampleEnd)
 }
 
 // daysBetween returns the number of per-day sample slots in [start, end).
@@ -647,7 +644,7 @@ func cmdItems(args []string) error {
 		return err
 	}
 
-	startDate, err := parseDate(*sampleStart)
+	startDate, err := util.ParseDate(*sampleStart)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start date: %w", err)
 	}
@@ -811,7 +808,7 @@ func cmdDays(args []string) error {
 		return err
 	}
 
-	startDate, err := parseDate(*sampleStart)
+	startDate, err := util.ParseDate(*sampleStart)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start date: %w", err)
 	}
@@ -917,7 +914,7 @@ func cmdProbability(args []string) error {
 		return fmt.Errorf("one of -days or -target-end-date must be provided")
 	}
 
-	startDate, err := parseDate(*sampleStart)
+	startDate, err := util.ParseDate(*sampleStart)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start date: %w", err)
 	}

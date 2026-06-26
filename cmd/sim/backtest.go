@@ -13,6 +13,7 @@ import (
 
 	"forecasting/internal/linear"
 	"forecasting/internal/sqlite"
+	"forecasting/internal/util"
 )
 
 // backtestRow is one row in the per-day output table.
@@ -104,13 +105,13 @@ func cmdBacktest(args []string) error {
 		return fmt.Errorf(`-format must be "text" or "csv"`)
 	}
 
-	targetDate, err := parseDate(*targetDateStr)
+	targetDate, err := util.ParseDate(*targetDateStr)
 	if err != nil {
 		return fmt.Errorf("invalid -target-date: %w", err)
 	}
 
 	now := time.Now().UTC()
-	sampleStartDate, err := parseDate(*sampleStart)
+	sampleStartDate, err := util.ParseDate(*sampleStart)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start: %w", err)
 	}
@@ -156,7 +157,7 @@ func cmdBacktest(args []string) error {
 	// started_at across the issue set.
 	var startDate time.Time
 	if *startDateStr != "" {
-		startDate, err = parseDate(*startDateStr)
+		startDate, err = util.ParseDate(*startDateStr)
 		if err != nil {
 			return fmt.Errorf("invalid -start-date: %w", err)
 		}

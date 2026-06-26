@@ -12,11 +12,8 @@ import (
 
 	"forecasting/internal/linear"
 	"forecasting/internal/sqlite"
+	"forecasting/internal/util"
 )
-
-func parseDate(s string) (time.Time, error) {
-	return time.ParseInLocation("2006-01-02", s, time.UTC)
-}
 
 // normalizedIssue holds per-issue lifecycle event times clamped to be
 // monotonically non-decreasing. All times are truncated to day resolution
@@ -217,21 +214,21 @@ func mean(vs []float64) float64 {
 }
 
 type flowHealth struct {
-	ThroughputPerDay     float64 // slope of Completed line
-	DeparturePerDay      float64 // slope of Departed line (completed + canceled)
-	AvgWIPBacklog        float64
-	AvgWIPInProgress     float64
-	AvgWIPCanceled       float64
-	AvgWIPDone           float64
-	AvgCycleTimeDays     float64 // mean(completed_at - created_at) for issues completed in window
-	LittlesLawCTDays     float64 // AvgWIPInProgress / ThroughputPerDay
-	StabilityBacklog     float64 // slope of Backlog band height (items/day); ≈0 → stable
-	StabilityInProgress  float64
-	StabilityCanceled    float64
-	StabilityDone        float64
-	WindowDays           int
-	TotalIssues          int
-	SkippedIssues        int
+	ThroughputPerDay    float64 // slope of Completed line
+	DeparturePerDay     float64 // slope of Departed line (completed + canceled)
+	AvgWIPBacklog       float64
+	AvgWIPInProgress    float64
+	AvgWIPCanceled      float64
+	AvgWIPDone          float64
+	AvgCycleTimeDays    float64 // mean(completed_at - created_at) for issues completed in window
+	LittlesLawCTDays    float64 // AvgWIPInProgress / ThroughputPerDay
+	StabilityBacklog    float64 // slope of Backlog band height (items/day); ≈0 → stable
+	StabilityInProgress float64
+	StabilityCanceled   float64
+	StabilityDone       float64
+	WindowDays          int
+	TotalIssues         int
+	SkippedIssues       int
 }
 
 func computeHealth(rows []dayRow, issues []normalizedIssue, windowStart, windowEnd time.Time) flowHealth {
@@ -525,32 +522,32 @@ Plotly.newPlot('chart', traces, layout, {responsive: true, displayModeBar: false
 </html>`
 
 type htmlData struct {
-	WindowStart         string
-	WindowEnd           string
-	TotalIssues         int
-	SkippedIssues       int
-	ThroughputPerDay    float64
-	DeparturePerDay     float64
-	AvgWIPBacklog       float64
-	AvgWIPInProgress    float64
-	AvgWIPCanceled      float64
-	AvgWIPDone          float64
-	AvgCycleTimeDays    float64
-	LittlesLawCTDays    float64
-	StabilityBacklog    float64
-	StabilityInProgress float64
-	StabilityCanceled   float64
-	VerdictBacklog      string
-	VerdictClassBacklog string
+	WindowStart            string
+	WindowEnd              string
+	TotalIssues            int
+	SkippedIssues          int
+	ThroughputPerDay       float64
+	DeparturePerDay        float64
+	AvgWIPBacklog          float64
+	AvgWIPInProgress       float64
+	AvgWIPCanceled         float64
+	AvgWIPDone             float64
+	AvgCycleTimeDays       float64
+	LittlesLawCTDays       float64
+	StabilityBacklog       float64
+	StabilityInProgress    float64
+	StabilityCanceled      float64
+	VerdictBacklog         string
+	VerdictClassBacklog    string
 	VerdictInProgress      string
 	VerdictClassInProgress string
-	VerdictCanceled      string
-	VerdictClassCanceled string
-	DatesJSON      template.JS
-	DoneJSON       template.JS
-	CanceledJSON   template.JS
-	InProgressJSON template.JS
-	BacklogJSON    template.JS
+	VerdictCanceled        string
+	VerdictClassCanceled   string
+	DatesJSON              template.JS
+	DoneJSON               template.JS
+	CanceledJSON           template.JS
+	InProgressJSON         template.JS
+	BacklogJSON            template.JS
 }
 
 func verdictClass(v string) string {
@@ -643,7 +640,7 @@ func main() {
 
 	windowEnd := today
 	if *endStr != "" {
-		t, err := parseDate(*endStr)
+		t, err := util.ParseDate(*endStr)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: invalid -end %q: %v\n", *endStr, err)
 			os.Exit(1)
@@ -653,7 +650,7 @@ func main() {
 
 	windowStart := today.AddDate(0, -3, 0)
 	if *startStr != "" {
-		t, err := parseDate(*startStr)
+		t, err := util.ParseDate(*startStr)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: invalid -start %q: %v\n", *startStr, err)
 			os.Exit(1)
