@@ -29,21 +29,6 @@ type reportItem struct {
 	Percentile  int
 }
 
-func ordinalSuffix(n int) string {
-	switch {
-	case n%100 >= 11 && n%100 <= 13:
-		return "th"
-	case n%10 == 1:
-		return "st"
-	case n%10 == 2:
-		return "nd"
-	case n%10 == 3:
-		return "rd"
-	default:
-		return "th"
-	}
-}
-
 // p85value returns the 85th-percentile value from a sorted slice.
 func p85value(sorted []float64) float64 {
 	if len(sorted) == 0 {
@@ -227,7 +212,7 @@ func outputText(items []reportItem, cycleTimes []float64, p85 float64, sampleSta
 			item.Identifier,
 			truncateTitle(item.Title),
 			item.AgeDays,
-			pct, ordinalSuffix(pct),
+			pct, util.OrdinalSuffix(pct),
 			formatState(item.StateName, item.StateType),
 			formatStartDate(item.StartedAt),
 			item.Assignee,
@@ -384,7 +369,7 @@ func outputHTML(items []reportItem, p85 float64, sampleStart, sampleEnd time.Tim
 			Title:      item.Title,
 			AgeDays:    item.AgeDays,
 			Percentile: item.Percentile,
-			Suffix:     ordinalSuffix(item.Percentile),
+			Suffix:     util.OrdinalSuffix(item.Percentile),
 			AgeClass:   ageClass(item.Percentile),
 			State:      formatState(item.StateName, item.StateType),
 			StartDate:  formatStartDate(item.StartedAt),
