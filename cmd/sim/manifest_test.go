@@ -52,7 +52,7 @@ func TestDBFingerprint_MissingFile(t *testing.T) {
 
 func TestNewManifest_Assembly(t *testing.T) {
 	cmd := flag.NewFlagSet("items", flag.ContinueOnError)
-	dbFile := cmd.String("db", "linear.db", "")
+	dbFile := cmd.String("db", "", "")
 	days := cmd.Int("days", 30, "")
 	if err := cmd.Parse([]string{"-db", "test.db"}); err != nil {
 		t.Fatal(err)

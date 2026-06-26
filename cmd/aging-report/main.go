@@ -177,7 +177,7 @@ func loadFromDB(dbPath string, sampleStart, sampleEnd time.Time, minCycleTime ti
 }
 
 func main() {
-	dbFile := flag.String("db", "linear.db", "path to SQLite database")
+	dbFile := flag.String("db", "", "path to SQLite database")
 	sampleStartStr := flag.String("sample-start", "", "Start of completed-issue window (YYYY-MM-DD, default: today minus 3 months)")
 	sampleEndStr := flag.String("sample-end", "", "End of completed-issue window (YYYY-MM-DD, default: today)")
 	format := flag.String("format", "text", "Output format: text, json, html")
@@ -185,6 +185,11 @@ func main() {
 	var teams linear.KeyList
 	flag.Var(&teams, "teams", "Comma-separated team keys to filter by (e.g. DATA,PLT); default: all teams")
 	flag.Parse()
+
+	if *dbFile == "" {
+		fmt.Fprintln(os.Stderr, "error: -db is required")
+		os.Exit(1)
+	}
 
 	var minCycleTime time.Duration
 	if *minCycleTimeStr != "" {

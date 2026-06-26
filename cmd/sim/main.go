@@ -619,7 +619,7 @@ func resolveSeed(cmd *flag.FlagSet, randomSeed int64, now time.Time) int64 {
 func cmdItems(args []string) error {
 	defaultStart, defaultEnd := defaultDateRange()
 	cmd := flag.NewFlagSet("items", flag.ExitOnError)
-	dbFile := cmd.String("db", "linear.db", "path to SQLite database")
+	dbFile := cmd.String("db", "", "path to SQLite database")
 	exclusionsFile := cmd.String("exclusions", "exclusions.json", "path to exclusions JSON file")
 	engineers := cmd.Int("engineers", 3, "number of (equivalent) engineers")
 	days := cmd.Int("days", 30, "number of days")
@@ -637,6 +637,10 @@ func cmdItems(args []string) error {
 	cmd.Var(&team, "team", "comma-separated list of specific engineer names to model individually")
 	manifestFile := cmd.String("manifest", "", `write a run-provenance JSON manifest to this path ("-" for stdout)`)
 	cmd.Parse(args)
+
+	if *dbFile == "" {
+		return fmt.Errorf("-db is required")
+	}
 
 	mode, err := resolveMode(isFlagSet(cmd, "engineers"), *wholeTeam, team)
 	if err != nil {
@@ -777,7 +781,7 @@ func printTrajectoryReport(pool *SamplePool, mode samplingMode, team []string, e
 func cmdDays(args []string) error {
 	defaultSampleStart, defaultSampleEnd := defaultDateRange()
 	cmd := flag.NewFlagSet("days", flag.ExitOnError)
-	dbFile := cmd.String("db", "linear.db", "path to SQLite database")
+	dbFile := cmd.String("db", "", "path to SQLite database")
 	exclusionsFile := cmd.String("exclusions", "exclusions.json", "path to exclusions JSON file")
 	engineers := cmd.Int("engineers", 3, "number of (equivalent) engineers")
 	items := intList{50}
@@ -797,6 +801,10 @@ func cmdDays(args []string) error {
 	cmd.Var(&team, "team", "comma-separated list of specific engineer names to model individually")
 	manifestFile := cmd.String("manifest", "", `write a run-provenance JSON manifest to this path ("-" for stdout)`)
 	cmd.Parse(args)
+
+	if *dbFile == "" {
+		return fmt.Errorf("-db is required")
+	}
 
 	mode, err := resolveMode(isFlagSet(cmd, "engineers"), *wholeTeam, team)
 	if err != nil {
@@ -871,7 +879,7 @@ func cmdDays(args []string) error {
 func cmdProbability(args []string) error {
 	defaultStart, defaultEnd := defaultDateRange()
 	cmd := flag.NewFlagSet("probability", flag.ExitOnError)
-	dbFile := cmd.String("db", "linear.db", "path to SQLite database")
+	dbFile := cmd.String("db", "", "path to SQLite database")
 	exclusionsFile := cmd.String("exclusions", "exclusions.json", "path to exclusions JSON file")
 	engineers := cmd.Int("engineers", 3, "number of (equivalent) engineers")
 	days := cmd.Int("days", 0, "number of days; mutually exclusive with -target-end-date, one must be given")
@@ -890,6 +898,10 @@ func cmdProbability(args []string) error {
 	cmd.Var(&team, "team", "comma-separated list of specific engineer names to model individually")
 	manifestFile := cmd.String("manifest", "", `write a run-provenance JSON manifest to this path ("-" for stdout)`)
 	cmd.Parse(args)
+
+	if *dbFile == "" {
+		return fmt.Errorf("-db is required")
+	}
 
 	mode, err := resolveMode(isFlagSet(cmd, "engineers"), *wholeTeam, team)
 	if err != nil {

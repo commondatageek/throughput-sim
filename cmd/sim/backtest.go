@@ -71,7 +71,7 @@ func allCreatedBy(issues []linear.Issue, d time.Time) bool {
 func cmdBacktest(args []string) error {
 	defaultStart, defaultEnd := defaultDateRange()
 	cmd := flag.NewFlagSet("backtest", flag.ExitOnError)
-	dbFile := cmd.String("db", "linear.db", "path to SQLite database")
+	dbFile := cmd.String("db", "", "path to SQLite database")
 	exclusionsFile := cmd.String("exclusions", "exclusions.json", "path to exclusions JSON file")
 	project := cmd.String("project", "", "project name to backtest (required)")
 	milestone := cmd.String("milestone", "", "milestone name within the project (optional)")
@@ -91,6 +91,9 @@ func cmdBacktest(args []string) error {
 	format := cmd.String("format", "text", `output format: "text" or "csv"`)
 	cmd.Parse(args)
 
+	if *dbFile == "" {
+		return fmt.Errorf("-db is required")
+	}
 	if *project == "" {
 		return fmt.Errorf("-project is required")
 	}

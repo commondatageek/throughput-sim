@@ -625,7 +625,7 @@ func outputHTML(rows []dayRow, h flowHealth, totalIssues, skippedIssues int, win
 }
 
 func main() {
-	dbFile := flag.String("db", "linear.db", "path to SQLite database")
+	dbFile := flag.String("db", "", "path to SQLite database")
 	startStr := flag.String("start", "", "Start date, inclusive (YYYY-MM-DD; default: today minus 3 months)")
 	endStr := flag.String("end", "", "End date, inclusive (YYYY-MM-DD; default: today)")
 	format := flag.String("format", "html", "Output format: html, json")
@@ -633,6 +633,11 @@ func main() {
 	var teams linear.KeyList
 	flag.Var(&teams, "teams", "Comma-separated team keys to filter by (e.g. ENG,DATA); default: all teams")
 	flag.Parse()
+
+	if *dbFile == "" {
+		fmt.Fprintln(os.Stderr, "error: -db is required")
+		os.Exit(1)
+	}
 
 	today := time.Now().UTC().Truncate(24 * time.Hour)
 
