@@ -44,15 +44,6 @@ func ordinalSuffix(n int) string {
 	}
 }
 
-// computePercentile returns what percentile v falls at in a sorted slice.
-func computePercentile(sorted []float64, v float64) int {
-	if len(sorted) == 0 {
-		return 0
-	}
-	rank := sort.Search(len(sorted), func(i int) bool { return sorted[i] > v })
-	return int(math.Round(float64(rank) / float64(len(sorted)) * 100))
-}
-
 // p85value returns the 85th-percentile value from a sorted slice.
 func p85value(sorted []float64) float64 {
 	if len(sorted) == 0 {
@@ -194,7 +185,7 @@ func main() {
 	sort.Float64s(cycleTimes)
 
 	for i := range inProgress {
-		inProgress[i].Percentile = computePercentile(cycleTimes, inProgress[i].AgeDays)
+		inProgress[i].Percentile = util.ComputePercentile(cycleTimes, inProgress[i].AgeDays)
 	}
 
 	sort.Slice(inProgress, func(i, j int) bool {
