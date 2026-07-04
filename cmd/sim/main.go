@@ -627,7 +627,7 @@ func cmdItems(args []string) error {
 	configFile := cmd.String("config", "", "path to a YAML config file supplying flag values (CLI flags override)")
 	cmd.Parse(args)
 
-	if err := applyConfig(cmd, *configFile); err != nil {
+	if err := util.ApplyConfig(cmd, *configFile); err != nil {
 		return err
 	}
 
@@ -796,7 +796,7 @@ func cmdDays(args []string) error {
 	configFile := cmd.String("config", "", "path to a YAML config file supplying flag values (CLI flags override)")
 	cmd.Parse(args)
 
-	if err := applyConfig(cmd, *configFile); err != nil {
+	if err := util.ApplyConfig(cmd, *configFile); err != nil {
 		return err
 	}
 
@@ -898,7 +898,7 @@ func cmdProbability(args []string) error {
 	configFile := cmd.String("config", "", "path to a YAML config file supplying flag values (CLI flags override)")
 	cmd.Parse(args)
 
-	if err := applyConfig(cmd, *configFile); err != nil {
+	if err := util.ApplyConfig(cmd, *configFile); err != nil {
 		return err
 	}
 
