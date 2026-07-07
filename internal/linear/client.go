@@ -66,8 +66,8 @@ func (c *Client) Fetch(ctx context.Context, since time.Time, teamKeys []string) 
 
 // ListTeams writes accessible teams to the provided writer (for CLI use),
 // sorted in ascending alphabetical order by team key.
-func (c *Client) ListTeams(ctx context.Context) ([]teamNode, error) {
-	var teams []teamNode
+func (c *Client) ListTeams(ctx context.Context) ([]Team, error) {
+	var teams []Team
 	var cursor string
 
 	for {
@@ -370,13 +370,13 @@ query Teams($after: String) {
 }
 `
 
-type teamNode struct {
+type Team struct {
 	Key  string `json:"key"`
 	Name string `json:"name"`
 }
 
 type teamsConnection struct {
-	Nodes    []teamNode `json:"nodes"`
+	Nodes    []Team `json:"nodes"`
 	PageInfo pageInfo   `json:"pageInfo"`
 }
 
