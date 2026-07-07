@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"forecasting/internal/linear"
+	"forecasting/internal/simulate"
 )
 
 // Manifest is a single JSON document recording everything that fed a
@@ -50,8 +51,8 @@ type Invocation struct {
 
 type FlagRecord struct {
 	Name    string `json:"name"`
-	Value   string `json:"value"`
 	Default string `json:"default"`
+	Value   string `json:"value"`
 	Set     bool   `json:"set"`
 }
 
@@ -70,9 +71,9 @@ type Resolved struct {
 }
 
 type DataSection struct {
-	DB                DataFile   `json:"db"`
-	ExclusionsPath    string     `json:"exclusions_path"`
-	ExclusionsApplied Exclusions `json:"exclusions_applied"`
+	DB                DataFile           `json:"db"`
+	ExclusionsPath    string             `json:"exclusions_path"`
+	ExclusionsApplied simulate.Exclusions `json:"exclusions_applied"`
 }
 
 type DataFile struct {
@@ -172,11 +173,11 @@ func dbFingerprint(path string) DataFile {
 	return d
 }
 
-func modeName(m samplingMode) string {
+func modeName(m simulate.Mode) string {
 	switch m {
-	case modeNamedTeam:
+	case simulate.ModeNamedTeam:
 		return "named_team"
-	case modeFullTeam:
+	case simulate.ModeFullTeam:
 		return "whole_team"
 	default:
 		return "anonymous"
@@ -190,12 +191,20 @@ func issueTime(t time.Time) string {
 	return t.UTC().Format(time.RFC3339)
 }
 
+func sumSlice(samples []int) int {
+	total := 0
+	for _, v := range samples {
+		total += v
+	}
+	return total
+}
+
 // manifestInputs is the single shared parameter bag the three subcommands
 // fill in to produce a Manifest.
 type manifestInputs struct {
 	Subcommand     string
 	Cmd            *flag.FlagSet
-	Mode           samplingMode
+	Mode           simulate.Mode
 	Team           []string
 	Include        []string
 	Engineers      int
@@ -205,8 +214,8 @@ type manifestInputs struct {
 	SampleEnd      time.Time
 	DBPath         string
 	ExclusionsPath string
-	Exclusions     Exclusions
-	Pool           *SamplePool
+	Exclusions     simulate.Exclusions
+	Pool           *simulate.SamplePool
 	Issues         []linear.Issue
 	Skipped        int
 	Extra          map[string]any
@@ -228,12 +237,12 @@ func newManifest(in manifestInputs) *Manifest {
 	})
 
 	// Pool summary: direct iteration works for both per-engineer and
-	// whole-team modes (the latter has the single "__whole_team__" key).
+	// whole-team modes (the latter has the single WholeTeamKey key).
 	perComp := make(map[string]int, len(in.Pool.PerEngineer))
 	perDays := make(map[string]int, len(in.Pool.PerEngineer))
 	totalComp, totalDays := 0, 0
 	for name, samples := range in.Pool.PerEngineer {
-		s := sum(samples)
+		s := sumSlice(samples)
 		perComp[name] = s
 		perDays[name] = len(samples)
 		totalComp += s
@@ -270,7 +279,7 @@ func newManifest(in manifestInputs) *Manifest {
 		Flags:         flags,
 		Resolved: Resolved{
 			Mode:        modeName(in.Mode),
-			ModeLabel:   modeLabel(in.Mode, in.Team, in.Engineers),
+			ModeLabel:   simulate.ModeLabel(in.Mode, in.Team, in.Engineers),
 			Engineers:   in.Engineers,
 			Team:        in.Team,
 			Include:     in.Include,
@@ -278,7 +287,7 @@ func newManifest(in manifestInputs) *Manifest {
 			Seed:        in.Seed,
 			SampleStart: in.SampleStart.UTC().Format(time.RFC3339),
 			SampleEnd:   in.SampleEnd.UTC().Format(time.RFC3339),
-			TotalDays:   daysBetween(in.SampleStart, in.SampleEnd),
+			TotalDays:   simulate.DaysBetween(in.SampleStart, in.SampleEnd),
 			Extra:       in.Extra,
 		},
 		Data: DataSection{

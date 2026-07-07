@@ -12,61 +12,22 @@ import (
 	"time"
 
 	"forecasting/internal/linear"
+	"forecasting/internal/simulate"
 	"forecasting/internal/sqlite"
 	"forecasting/internal/util"
 )
 
-// backtestRow is one row in the per-day output table.
-type backtestRow struct {
-	Date      time.Time
-	Completed int
-	Remaining int
-	Prob      float64
-}
-
-// countAsOf counts how many issues in the fixed set were completed by
-// midnight of d, and how many were not yet completed but had been created
-// by that point (and are therefore "remaining" work for that day).
-func countAsOf(issues []linear.Issue, d time.Time) (completed, remaining int) {
-	for _, it := range issues {
-		completedByD := !it.CompletedAt.IsZero() && !it.CompletedAt.After(d)
-		notYetCreated := !it.CreatedAt.IsZero() && it.CreatedAt.After(d)
-		switch {
-		case completedByD:
-			completed++
-		case notYetCreated:
-			// neither column
-		default:
-			remaining++
+// issuesToBacktestItems converts linear.Issue records to simulate.BacktestItem.
+func issuesToBacktestItems(issues []linear.Issue) []simulate.BacktestItem {
+	items := make([]simulate.BacktestItem, len(issues))
+	for i, it := range issues {
+		items[i] = simulate.BacktestItem{
+			CreatedAt:   it.CreatedAt,
+			StartedAt:   it.StartedAt,
+			CompletedAt: it.CompletedAt,
 		}
 	}
-	return
-}
-
-// earliestStartedAt returns the minimum non-zero StartedAt across all issues,
-// or the zero time if none have one.
-func earliestStartedAt(issues []linear.Issue) time.Time {
-	var earliest time.Time
-	for _, it := range issues {
-		if it.StartedAt.IsZero() {
-			continue
-		}
-		if earliest.IsZero() || it.StartedAt.Before(earliest) {
-			earliest = it.StartedAt
-		}
-	}
-	return earliest
-}
-
-// allCreatedBy reports whether every issue in the set had been created by d
-// (i.e. nothing is still waiting to enter the backlog).
-func allCreatedBy(issues []linear.Issue, d time.Time) bool {
-	for _, it := range issues {
-		if !it.CreatedAt.IsZero() && it.CreatedAt.After(d) {
-			return false
-		}
-	}
-	return true
+	return items
 }
 
 func cmdBacktest(args []string) error {
@@ -125,7 +86,7 @@ func cmdBacktest(args []string) error {
 		return fmt.Errorf("invalid -sample-end: %w", err)
 	}
 
-	mode, err := resolveMode(isFlagSet(cmd, "engineers"), *wholeTeam, team)
+	mode, err := simulate.ResolveMode(isFlagSet(cmd, "engineers"), *wholeTeam, team)
 	if err != nil {
 		return err
 	}
@@ -135,7 +96,7 @@ func cmdBacktest(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := validatePool(pd.Pool, mode, team, false); err != nil {
+	if err := simulate.ValidatePool(pd.Pool, mode, team, false); err != nil {
 		return err
 	}
 	seed := resolveSeed(cmd, *randomSeed, now)
@@ -158,6 +119,8 @@ func cmdBacktest(args []string) error {
 		return fmt.Errorf("no issues found for project %q — check spelling", *project)
 	}
 
+	btItems := issuesToBacktestItems(issues)
+
 	// Resolve start date: explicit flag wins; otherwise infer from the earliest
 	// started_at across the issue set.
 	var startDate time.Time
@@ -167,11 +130,10 @@ func cmdBacktest(args []string) error {
 			return fmt.Errorf("invalid -replay-start-date: %w", err)
 		}
 	} else {
-		startDate = earliestStartedAt(issues)
+		startDate = simulate.EarliestStartedAt(btItems)
 		if startDate.IsZero() {
 			return fmt.Errorf("no started_at found in issue set; provide -replay-start-date explicitly")
 		}
-		// Truncate to calendar day.
 		startDate = startDate.UTC().Truncate(24 * time.Hour)
 	}
 
@@ -179,31 +141,20 @@ func cmdBacktest(args []string) error {
 		return fmt.Errorf("-target-end-date must be after -replay-start-date (inferred: %s)", startDate.Format("2006-01-02"))
 	}
 
-	// Daily backtest loop.
-	var rows []backtestRow
-	for d := startDate; !d.After(targetDate); d = d.AddDate(0, 0, 1) {
-		completed, remaining := countAsOf(issues, d)
-		daysToTarget := int(targetDate.Sub(d).Hours()/24) + 1
-
-		var prob float64
-		if remaining == 0 {
-			prob = 100.0
-		} else {
-			dist := simulateItemsInDays(pd.Pool, mode, team, *engineers, daysToTarget, *simulations, *goroutines, seed)
-			prob = probabilityAtLeast(dist, remaining)
-		}
-		rows = append(rows, backtestRow{d, completed, remaining, prob})
-
-		if remaining == 0 && allCreatedBy(issues, d) {
-			break
-		}
-	}
+	rows := simulate.RunBacktest(pd.Pool, btItems, startDate, targetDate, simulate.Params{
+		Mode:        mode,
+		Team:        team,
+		Engineers:   *engineers,
+		Simulations: *simulations,
+		Workers:     *goroutines,
+		Seed:        seed,
+	})
 
 	switch *format {
 	case "csv":
 		return printBacktestCSV(rows)
 	default:
-		label := modeLabel(mode, team, *engineers)
+		label := simulate.ModeLabel(mode, team, *engineers)
 		scope := *project
 		if *milestone != "" {
 			scope += " / " + *milestone
@@ -213,7 +164,7 @@ func cmdBacktest(args []string) error {
 	return nil
 }
 
-func printBacktestText(rows []backtestRow, scope, label string, total int, startDate, sampleStart, sampleEnd time.Time) {
+func printBacktestText(rows []simulate.BacktestRow, scope, label string, total int, startDate, sampleStart, sampleEnd time.Time) {
 	fmt.Printf("Backtest: %s (%d issues, %s)\n", scope, total, label)
 	fmt.Printf("Start date: %s  Sample window: %s – %s\n\n",
 		startDate.Format("2006-01-02"), sampleStart.Format("2006-01-02"), sampleEnd.Format("2006-01-02"))
@@ -227,7 +178,7 @@ func printBacktestText(rows []backtestRow, scope, label string, total int, start
 	w.Flush()
 }
 
-func printBacktestCSV(rows []backtestRow) error {
+func printBacktestCSV(rows []simulate.BacktestRow) error {
 	w := csv.NewWriter(os.Stdout)
 	if err := w.Write([]string{"date", "completed", "remaining", "probability"}); err != nil {
 		return err

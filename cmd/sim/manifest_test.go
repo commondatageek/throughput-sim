@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"forecasting/internal/linear"
+	"forecasting/internal/simulate"
 )
 
 func TestBuildInfo_Degrades(t *testing.T) {
@@ -58,7 +59,7 @@ func TestNewManifest_Assembly(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pool := &SamplePool{PerEngineer: map[string][]int{
+	pool := &simulate.SamplePool{PerEngineer: map[string][]int{
 		"alice": {1, 0, 2},
 		"bob":   {0, 0},
 	}}
@@ -70,7 +71,7 @@ func TestNewManifest_Assembly(t *testing.T) {
 	m := newManifest(manifestInputs{
 		Subcommand:  "items",
 		Cmd:         cmd,
-		Mode:        modeAnonymous,
+		Mode:        simulate.ModeAnonymous,
 		Engineers:   3,
 		Seed:        42,
 		SampleStart: day(2025, 1, 1),
