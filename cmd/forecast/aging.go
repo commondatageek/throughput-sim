@@ -67,6 +67,8 @@ func cmdAging(args []string) error {
 		return fmt.Errorf("-sample-start must be before -sample-end")
 	}
 
+	opts := aging.Options{Teams: teams, SampleStart: sampleStart, SampleEnd: sampleEnd, MinCycleTime: minCycleTime}
+
 	store, err := sqlite.Open(*dbFile)
 	if err != nil {
 		return fmt.Errorf("open db: %w", err)
@@ -75,17 +77,17 @@ func cmdAging(args []string) error {
 
 	ctx := context.Background()
 
-	completed, err := store.CompletedBetween(ctx, sampleStart, sampleEnd, nil, teams)
+	completed, err := store.CompletedBetween(ctx, opts.SampleStart, opts.SampleEnd, nil, opts.Teams)
 	if err != nil {
 		return fmt.Errorf("query completed: %w", err)
 	}
 
-	active, err := store.InProgress(ctx, teams)
+	active, err := store.InProgress(ctx, opts.Teams)
 	if err != nil {
 		return fmt.Errorf("query in-progress: %w", err)
 	}
 
-	cycleTimes := aging.CycleTimes(completed, minCycleTime)
+	cycleTimes := aging.CycleTimes(completed, opts.MinCycleTime)
 	sort.Float64s(cycleTimes)
 
 	inProgress := aging.InProgressItems(active, today)
@@ -103,11 +105,11 @@ func cmdAging(args []string) error {
 
 	switch *format {
 	case "text":
-		return aging.RenderText(os.Stdout, inProgress, cycleTimes, p85, sampleStart, sampleEnd)
+		return aging.RenderText(os.Stdout, inProgress, cycleTimes, p85, opts.SampleStart, opts.SampleEnd)
 	case "json":
 		return aging.RenderJSON(os.Stdout, inProgress)
 	case "html":
-		return aging.RenderHTML(os.Stdout, inProgress, p85, sampleStart, sampleEnd, len(cycleTimes))
+		return aging.RenderHTML(os.Stdout, inProgress, p85, opts.SampleStart, opts.SampleEnd, len(cycleTimes))
 	default:
 		return fmt.Errorf("unknown -format %q (use text, json, or html)", *format)
 	}

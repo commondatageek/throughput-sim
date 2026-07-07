@@ -57,13 +57,15 @@ func cmdCFD(args []string) error {
 		return fmt.Errorf("-start must be before -end")
 	}
 
+	opts := cfd.Options{Teams: teams, Start: windowStart, End: windowEnd}
+
 	store, err := sqlite.Open(*dbFile)
 	if err != nil {
 		return fmt.Errorf("open db: %w", err)
 	}
 	defer store.Close()
 
-	raw, err := store.CFDIssues(context.Background(), teams)
+	raw, err := store.CFDIssues(context.Background(), opts.Teams)
 	if err != nil {
 		return fmt.Errorf("query issues: %w", err)
 	}
@@ -79,13 +81,13 @@ func cmdCFD(args []string) error {
 		normalized = append(normalized, ni)
 	}
 
-	rows := cfd.BuildGrid(normalized, windowStart, windowEnd)
+	rows := cfd.BuildGrid(normalized, opts.Start, opts.End)
 
 	if err := cfd.AssertInvariants(rows); err != nil {
 		return fmt.Errorf("CFD invariant violated: %w", err)
 	}
 
-	health := cfd.ComputeHealth(rows, normalized, windowStart, windowEnd)
+	health := cfd.ComputeHealth(rows, normalized, opts.Start, opts.End)
 	health.TotalIssues = len(raw)
 	health.SkippedIssues = skipped
 
@@ -101,7 +103,7 @@ func cmdCFD(args []string) error {
 
 	switch *format {
 	case "html":
-		return cfd.RenderHTML(out, rows, health, len(raw), skipped, windowStart, windowEnd)
+		return cfd.RenderHTML(out, rows, health, len(raw), skipped, opts.Start, opts.End)
 	case "json":
 		return cfd.RenderJSON(out, rows, health)
 	default:

@@ -13,6 +13,23 @@ import (
 	"forecasting/internal/util"
 )
 
+// Options controls which issues feed the cycle-time distribution and the
+// in-progress ranking. Every field mirrors a `forecast aging` flag (and thus a
+// `-config` YAML key of the same name).
+type Options struct {
+	// Teams is the `-teams` flag: team keys to filter by; empty means all teams.
+	Teams linear.KeyList
+	// SampleStart is the `-sample-start` flag, resolved to a concrete date
+	// (default: today minus 3 months).
+	SampleStart time.Time
+	// SampleEnd is the `-sample-end` flag, resolved to a concrete date
+	// (default: today).
+	SampleEnd time.Time
+	// MinCycleTime is the `-min-cycle-time` flag, resolved from its duration
+	// string (e.g. "5m", "1h", "1d"); zero means no floor.
+	MinCycleTime time.Duration
+}
+
 // Item is an in-progress issue annotated with its age and percentile rank
 // against the historical cycle-time distribution.
 type Item struct {

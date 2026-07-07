@@ -66,6 +66,63 @@ All commands live in the single `forecast` binary. Run `forecast` with no argume
 }
 ```
 
+### Config files (`-config`)
+
+Every subcommand accepts `-config <file.yaml>`, applied via `util.ApplyConfig` (`internal/util/config.go`) immediately after `fs.Parse`. Precedence is **CLI flag > config file > built-in default**. Rules:
+
+- **Keys equal flag names**, exactly as passed on the command line (e.g. `-sample-end` → `sample-end`, `-random-seed` → `random-seed`).
+- **List flags** (`-teams`, `-team`, `-include`, `-percentile`, `-items`) take a YAML sequence, joined into the same comma-separated string the flag itself accepts: `teams: [ENG, DATA]` behaves identically to `-teams ENG,DATA`. A plain string (`teams: "ENG,DATA"`) works too.
+- **Presence-sensitive flags behave as if passed on the CLI.** Config values are applied via `fs.Set`, so `sample-end` or `random-seed` set only in a config file still counts as "explicitly set" for `resolveEndDate`/`resolveSeed` — e.g. a `random-seed: 42` in config pins the seed exactly like `-random-seed 42` would, rather than falling back to the time-based default.
+- The `config` key itself is reserved/ignored inside the file (prevents self-reference).
+- One config file's keys are shared by exactly one command's `FlagSet` — there's no per-command sectioning (a `sim items` config and a `count` config are separate files); see Stage 4's non-goal on a shared multi-command file.
+
+Example config for `forecast sim items` (`sim-items.yaml`):
+```yaml
+db: linear.db
+engineers: 4
+days: 30
+sample-start: "2025-01-01"
+sample-end: "2025-07-01"
+random-seed: 42
+percentile: [5, 25, 50, 75, 95]
+team: [alice, bob]
+```
+```bash
+forecast sim items -config sim-items.yaml            # uses every value above
+forecast sim items -config sim-items.yaml -days 60   # CLI -days wins over the file's 30
+```
+
+Example for `forecast linear sync` (`sync.yaml`):
+```yaml
+db: linear.db
+teams: [ENG, DATA]
+full-reload: true
+```
+
+Example for `forecast count` (`count.yaml`):
+```yaml
+db: linear.db
+milestones: true
+updated-since: "2025-04-01"
+teams: [ENG, DESIGN]
+```
+
+Example for `forecast aging` (`aging.yaml`):
+```yaml
+db: linear.db
+format: html
+sample-start: "2025-01-01"
+min-cycle-time: 1h
+```
+
+Example for `forecast cfd` (`cfd.yaml`):
+```yaml
+db: linear.db
+start: "2025-04-01"
+end: "2025-07-01"
+format: json
+```
+
 ### Conventions worth knowing
 
 - `-sample-end` semantics: if explicitly set, it's a calendar date (midnight, that day excluded). If omitted, it defaults to *now* so today's already-completed work counts (see `resolveEndDate` in `cmd/forecast/common.go`).

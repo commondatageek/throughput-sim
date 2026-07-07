@@ -14,10 +14,18 @@ import (
 	"forecasting/internal/sqlite"
 )
 
-// Options controls which teams are synced and how.
+// Options controls which teams are synced and how. Every field mirrors a
+// `forecast linear sync` flag (and thus a `-config` YAML key of the same
+// name, lower-cased with hyphens, e.g. `full-reload`).
 type Options struct {
-	Teams      linear.KeyList
-	AllTeams   bool
+	// Teams is the `-teams` flag: candidate team keys to sync, extending
+	// whatever teams already exist in the store. Mutually exclusive with AllTeams.
+	Teams linear.KeyList
+	// AllTeams is the `-all-teams` flag: expand the candidate set to every
+	// team the Linear API token can access. Mutually exclusive with Teams.
+	AllTeams bool
+	// FullReload is the `-full-reload` flag: ignore each team's watermark and
+	// re-sync its full issue history instead of an incremental sync.
 	FullReload bool
 }
 

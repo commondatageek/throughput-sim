@@ -7,6 +7,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"forecasting/internal/linear"
 	"forecasting/internal/sqlite"
 )
 
@@ -14,6 +15,17 @@ const (
 	NoProjectLabel   = "(No Project)"
 	NoMilestoneLabel = "(No Milestone)"
 )
+
+// Options controls which issues are counted. Every field mirrors a
+// `forecast count` flag (and thus a `-config` YAML key of the same name).
+type Options struct {
+	// Teams is the `-teams` flag: team keys to filter by; empty means all teams.
+	Teams linear.KeyList
+	// Since is the `-updated-since` flag, resolved to a concrete date
+	// (default: today minus 3 months). Projects whose most recently updated
+	// issue predates it are dropped.
+	Since time.Time
+}
 
 // Project holds the milestone breakdown for a single project, its total
 // not-completed issue count, and the timestamp of its most recently updated issue.

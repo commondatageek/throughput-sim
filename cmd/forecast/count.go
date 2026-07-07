@@ -38,12 +38,14 @@ func cmdCount(args []string) error {
 		return fmt.Errorf("invalid -updated-since %q (want YYYY-MM-DD): %w", *updatedSince, err)
 	}
 
-	projects, total, multiTeam, err := loadCountProjects(*dbFile, teams, since)
+	opts := counts.Options{Teams: teams, Since: since}
+
+	projects, total, multiTeam, err := loadCountProjects(*dbFile, opts)
 	if err != nil {
 		return err
 	}
 
-	showTeams := len(teams) == 0 && multiTeam
+	showTeams := len(opts.Teams) == 0 && multiTeam
 
 	if *milestones {
 		return counts.RenderGrouped(os.Stdout, projects, total, showTeams)
@@ -54,7 +56,7 @@ func cmdCount(args []string) error {
 // loadCountProjects reads the not-completed issue counts from the store and
 // returns the folded project list. It also reports whether the database holds
 // more than one team.
-func loadCountProjects(dbPath string, teamKeys []string, since time.Time) ([]counts.Project, int, bool, error) {
+func loadCountProjects(dbPath string, opts counts.Options) ([]counts.Project, int, bool, error) {
 	store, err := sqlite.Open(dbPath)
 	if err != nil {
 		return nil, 0, false, fmt.Errorf("open db: %w", err)
@@ -69,16 +71,16 @@ func loadCountProjects(dbPath string, teamKeys []string, since time.Time) ([]cou
 	}
 	multiTeam := len(allTeams) > 1
 
-	countRows, err := store.NotCompletedCounts(ctx, teamKeys)
+	countRows, err := store.NotCompletedCounts(ctx, opts.Teams)
 	if err != nil {
 		return nil, 0, false, err
 	}
 
-	activity, err := store.ProjectLastUpdated(ctx, teamKeys)
+	activity, err := store.ProjectLastUpdated(ctx, opts.Teams)
 	if err != nil {
 		return nil, 0, false, err
 	}
 
-	projects, total := counts.Compute(countRows, activity, since)
+	projects, total := counts.Compute(countRows, activity, opts.Since)
 	return projects, total, multiTeam, nil
 }
