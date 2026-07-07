@@ -9,11 +9,25 @@ import (
 	"math"
 	"time"
 
+	"forecasting/internal/linear"
 	"forecasting/internal/sqlite"
 )
 
 //go:embed template.html
 var htmlTemplate string
+
+// Options controls which issues are included and the CFD's display window.
+// Every field mirrors a `forecast cfd` flag (and thus a `-config` YAML key of
+// the same name).
+type Options struct {
+	// Teams is the `-teams` flag: team keys to filter by; empty means all teams.
+	Teams linear.KeyList
+	// Start is the `-start` flag, resolved to a concrete date (default: today
+	// minus 3 months).
+	Start time.Time
+	// End is the `-end` flag, resolved to a concrete date (default: today).
+	End time.Time
+}
 
 // NormalizedIssue holds per-issue lifecycle event times clamped to be
 // monotonically non-decreasing. All times are truncated to day resolution
