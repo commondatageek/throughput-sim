@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -171,4 +172,75 @@ func resolveSeed(cmd *flag.FlagSet, randomSeed int64, now time.Time) int64 {
 		return randomSeed
 	}
 	return now.UnixNano()
+}
+
+// --- Shared flag registration ---
+//
+// These helpers just wrap repeated fs.String/fs.Var calls; each subcommand
+// still owns its FlagSet, still calls Parse itself, and still applies
+// -config and the isFlagSet presence checks in the same order as before.
+
+// addDBFlag registers the -db flag used by every subcommand that reads a
+// SQLite store.
+func addDBFlag(fs *flag.FlagSet) *string {
+	return fs.String("db", "", "path to SQLite database")
+}
+
+// requireDB reports an error if -db was left unset.
+func requireDB(db *string) error {
+	if *db == "" {
+		return fmt.Errorf("-db is required")
+	}
+	return nil
+}
+
+// addConfigFlag registers the -config flag used by every subcommand.
+func addConfigFlag(fs *flag.FlagSet) *string {
+	return fs.String("config", "", "path to a YAML config file supplying flag values (CLI flags override)")
+}
+
+// addTeamsFlag registers the -teams flag. usage is passed in whole (not just
+// an example) because its wording differs meaningfully between commands that
+// filter to a team set (aging/cfd/count) and linear sync, where -teams
+// extends the candidate set rather than filtering.
+func addTeamsFlag(fs *flag.FlagSet, usage string) *linear.KeyList {
+	var teams linear.KeyList
+	fs.Var(&teams, "teams", usage)
+	return &teams
+}
+
+// simFlags bundles the sample-window/mode flag block shared by all four `sim`
+// subcommands (items/days/probability/backtest). -items/-days/-percentile/
+// -manifest differ per command and are declared there instead.
+type simFlags struct {
+	ExclusionsFile *string
+	Engineers      *int
+	WholeTeam      *bool
+	Simulations    *int
+	Goroutines     *int
+	SampleStart    *string
+	SampleEnd      *string
+	RandomSeed     *int64
+	Include        stringList
+	Team           stringList
+}
+
+// addSimFlags registers simFlags's block onto fs and returns the bundle. The
+// -simulations usage text defaults to "...to run"; callers with a different
+// need (sim backtest runs simulations per backtested day) can override
+// fs.Lookup("simulations").Usage afterward.
+func addSimFlags(fs *flag.FlagSet) *simFlags {
+	defaultStart, defaultEnd := defaultDateRange()
+	sf := &simFlags{}
+	sf.ExclusionsFile = fs.String("exclusions", "exclusions.json", "path to exclusions JSON file")
+	sf.Engineers = fs.Int("engineers", 3, "number of (equivalent) engineers")
+	sf.WholeTeam = fs.Bool("whole-team", false, "use whole-team daily throughput from historical data (ignores -engineers)")
+	sf.Simulations = fs.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
+	sf.Goroutines = fs.Int("goroutines", runtime.NumCPU(), "number of parallel worker goroutines")
+	sf.SampleStart = fs.String("sample-start", defaultStart, "sample data start date (YYYY-MM-DD)")
+	sf.SampleEnd = fs.String("sample-end", defaultEnd, "sample data end date (YYYY-MM-DD)")
+	sf.RandomSeed = fs.Int64("random-seed", 0, "seed for the random number generator (default: time-based, non-deterministic)")
+	fs.Var(&sf.Include, "include", "comma-separated list of engineer names to include (default: all)")
+	fs.Var(&sf.Team, "team", "comma-separated list of specific engineer names to model individually")
+	return sf
 }

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"forecasting/internal/counts"
-	"forecasting/internal/linear"
 	"forecasting/internal/sqlite"
 	"forecasting/internal/util"
 )
@@ -17,20 +16,19 @@ func cmdCount(args []string) error {
 	defaultSince := time.Now().AddDate(0, -3, 0).Format("2006-01-02")
 
 	cmd := flag.NewFlagSet("count", flag.ExitOnError)
-	dbFile := cmd.String("db", "", "path to SQLite database")
+	dbFile := addDBFlag(cmd)
 	milestones := cmd.Bool("milestones", false, "add a per-milestone breakdown under each project")
 	updatedSince := cmd.String("updated-since", defaultSince, "only include projects with an issue updated on/after this date (YYYY-MM-DD)")
-	var teams linear.KeyList
-	cmd.Var(&teams, "teams", "comma-separated team keys to filter by (e.g. ENG,DESIGN); default: all teams")
-	configFile := cmd.String("config", "", "path to a YAML config file supplying flag values (CLI flags override)")
+	teams := addTeamsFlag(cmd, "comma-separated team keys to filter by (e.g. ENG,DESIGN); default: all teams")
+	configFile := addConfigFlag(cmd)
 	cmd.Parse(args)
 
 	if err := util.ApplyConfig(cmd, *configFile); err != nil {
 		return err
 	}
 
-	if *dbFile == "" {
-		return fmt.Errorf("-db is required")
+	if err := requireDB(dbFile); err != nil {
+		return err
 	}
 
 	since, err := time.Parse("2006-01-02", *updatedSince)
@@ -38,7 +36,7 @@ func cmdCount(args []string) error {
 		return fmt.Errorf("invalid -updated-since %q (want YYYY-MM-DD): %w", *updatedSince, err)
 	}
 
-	opts := counts.Options{Teams: teams, Since: since}
+	opts := counts.Options{Teams: *teams, Since: since}
 
 	projects, total, multiTeam, err := loadCountProjects(*dbFile, opts)
 	if err != nil {

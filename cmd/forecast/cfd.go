@@ -8,29 +8,27 @@ import (
 	"time"
 
 	"forecasting/internal/cfd"
-	"forecasting/internal/linear"
 	"forecasting/internal/sqlite"
 	"forecasting/internal/util"
 )
 
 func cmdCFD(args []string) error {
 	cmd := flag.NewFlagSet("cfd", flag.ExitOnError)
-	dbFile := cmd.String("db", "", "path to SQLite database")
+	dbFile := addDBFlag(cmd)
 	startStr := cmd.String("start", "", "start date, inclusive (YYYY-MM-DD; default: today minus 3 months)")
 	endStr := cmd.String("end", "", "end date, inclusive (YYYY-MM-DD; default: today)")
 	format := cmd.String("format", "html", "output format: html, json")
 	outPath := cmd.String("out", "", "write output to this file instead of stdout")
-	var teams linear.KeyList
-	cmd.Var(&teams, "teams", "comma-separated team keys to filter by (e.g. ENG,DATA); default: all teams")
-	configFile := cmd.String("config", "", "path to a YAML config file supplying flag values (CLI flags override)")
+	teams := addTeamsFlag(cmd, "comma-separated team keys to filter by (e.g. ENG,DATA); default: all teams")
+	configFile := addConfigFlag(cmd)
 	cmd.Parse(args)
 
 	if err := util.ApplyConfig(cmd, *configFile); err != nil {
 		return err
 	}
 
-	if *dbFile == "" {
-		return fmt.Errorf("-db is required")
+	if err := requireDB(dbFile); err != nil {
+		return err
 	}
 
 	today := time.Now().UTC().Truncate(24 * time.Hour)
@@ -57,7 +55,7 @@ func cmdCFD(args []string) error {
 		return fmt.Errorf("-start must be before -end")
 	}
 
-	opts := cfd.Options{Teams: teams, Start: windowStart, End: windowEnd}
+	opts := cfd.Options{Teams: *teams, Start: windowStart, End: windowEnd}
 
 	store, err := sqlite.Open(*dbFile)
 	if err != nil {

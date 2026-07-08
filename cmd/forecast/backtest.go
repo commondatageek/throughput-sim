@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"runtime"
 	"strconv"
 	"text/tabwriter"
 	"time"
@@ -31,35 +30,24 @@ func issuesToBacktestItems(issues []linear.Issue) []simulate.BacktestItem {
 }
 
 func cmdSimBacktest(args []string) error {
-	defaultStart, defaultEnd := defaultDateRange()
 	cmd := flag.NewFlagSet("sim backtest", flag.ExitOnError)
-	dbFile := cmd.String("db", "", "path to SQLite database")
-	exclusionsFile := cmd.String("exclusions", "exclusions.json", "path to exclusions JSON file")
+	dbFile := addDBFlag(cmd)
+	sf := addSimFlags(cmd)
+	cmd.Lookup("simulations").Usage = "number of Monte Carlo simulations to run per backtested day"
 	project := cmd.String("project", "", "project name to backtest (required)")
 	milestone := cmd.String("milestone", "", "milestone name within the project (optional)")
 	replayStartStr := cmd.String("replay-start-date", "", "first day to replay from, inclusive (YYYY-MM-DD); default: earliest started_at across the issue set")
 	targetEndStr := cmd.String("target-end-date", "", "completion deadline to forecast against (YYYY-MM-DD, required)")
-	engineers := cmd.Int("engineers", 3, "number of (equivalent) engineers")
-	wholeTeam := cmd.Bool("whole-team", false, "use whole-team daily throughput from historical data (ignores -engineers)")
-	simulations := cmd.Int("simulations", 10_000, "number of Monte Carlo simulations to run per backtested day")
-	goroutines := cmd.Int("goroutines", runtime.NumCPU(), "number of parallel worker goroutines")
-	sampleStart := cmd.String("sample-start", defaultStart, "sample data start date (YYYY-MM-DD)")
-	sampleEnd := cmd.String("sample-end", defaultEnd, "sample data end date (YYYY-MM-DD)")
-	randomSeed := cmd.Int64("random-seed", 0, "seed for the random number generator (default: time-based, non-deterministic)")
-	var include stringList
-	cmd.Var(&include, "include", "comma-separated list of engineer names to include (default: all)")
-	var team stringList
-	cmd.Var(&team, "team", "comma-separated list of specific engineer names to model individually")
 	format := cmd.String("format", "text", `output format: "text" or "csv"`)
-	configFile := cmd.String("config", "", "path to a YAML config file supplying flag values (CLI flags override)")
+	configFile := addConfigFlag(cmd)
 	cmd.Parse(args)
 
 	if err := util.ApplyConfig(cmd, *configFile); err != nil {
 		return err
 	}
 
-	if *dbFile == "" {
-		return fmt.Errorf("-db is required")
+	if err := requireDB(dbFile); err != nil {
+		return err
 	}
 	if *project == "" {
 		return fmt.Errorf("-project is required")
@@ -77,29 +65,29 @@ func cmdSimBacktest(args []string) error {
 	}
 
 	now := time.Now().UTC()
-	sampleStartDate, err := util.ParseDate(*sampleStart)
+	sampleStartDate, err := util.ParseDate(*sf.SampleStart)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start: %w", err)
 	}
-	sampleEndDate, err := resolveEndDate(cmd, *sampleEnd, now)
+	sampleEndDate, err := resolveEndDate(cmd, *sf.SampleEnd, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-end: %w", err)
 	}
 
-	mode, err := simulate.ResolveMode(isFlagSet(cmd, "engineers"), *wholeTeam, team)
+	mode, err := simulate.ResolveMode(isFlagSet(cmd, "engineers"), *sf.WholeTeam, sf.Team)
 	if err != nil {
 		return err
 	}
 
 	// Build the fixed sample pool once; reused for every backtested day.
-	pd, err := loadPool(*dbFile, *exclusionsFile, include, sampleStartDate, sampleEndDate, *wholeTeam)
+	pd, err := loadPool(*dbFile, *sf.ExclusionsFile, sf.Include, sampleStartDate, sampleEndDate, *sf.WholeTeam)
 	if err != nil {
 		return err
 	}
-	if err := simulate.ValidatePool(pd.Pool, mode, team, false); err != nil {
+	if err := simulate.ValidatePool(pd.Pool, mode, sf.Team, false); err != nil {
 		return err
 	}
-	seed := resolveSeed(cmd, *randomSeed, now)
+	seed := resolveSeed(cmd, *sf.RandomSeed, now)
 
 	// Fetch the tracked issue set once.
 	store, err := sqlite.Open(*dbFile)
@@ -143,10 +131,10 @@ func cmdSimBacktest(args []string) error {
 
 	rows := simulate.RunBacktest(pd.Pool, btItems, startDate, targetDate, simulate.Params{
 		Mode:        mode,
-		Team:        team,
-		Engineers:   *engineers,
-		Simulations: *simulations,
-		Workers:     *goroutines,
+		Team:        sf.Team,
+		Engineers:   *sf.Engineers,
+		Simulations: *sf.Simulations,
+		Workers:     *sf.Goroutines,
 		Seed:        seed,
 	})
 
@@ -154,7 +142,7 @@ func cmdSimBacktest(args []string) error {
 	case "csv":
 		return printBacktestCSV(rows)
 	default:
-		label := simulate.ModeLabel(mode, team, *engineers)
+		label := simulate.ModeLabel(mode, sf.Team, *sf.Engineers)
 		scope := *project
 		if *milestone != "" {
 			scope += " / " + *milestone

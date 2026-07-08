@@ -15,20 +15,19 @@ import (
 
 func cmdLinearSync(args []string) error {
 	cmd := flag.NewFlagSet("linear sync", flag.ExitOnError)
-	dbFile := cmd.String("db", "", "path to SQLite database")
-	var teams linear.KeyList
-	cmd.Var(&teams, "teams", "comma-separated team keys, e.g. ENG,DESIGN; limits the candidate team set")
+	dbFile := addDBFlag(cmd)
+	teams := addTeamsFlag(cmd, "comma-separated team keys, e.g. ENG,DESIGN; limits the candidate team set")
 	allTeams := cmd.Bool("all-teams", false, "expand the candidate team set to every accessible Linear team; mutually exclusive with -teams")
 	fullReload := cmd.Bool("full-reload", false, "ignore each team's stored watermark and do a full reload")
-	configFile := cmd.String("config", "", "path to a YAML config file supplying flag values (CLI flags override)")
+	configFile := addConfigFlag(cmd)
 	cmd.Parse(args)
 
 	if err := util.ApplyConfig(cmd, *configFile); err != nil {
 		return err
 	}
 
-	if *dbFile == "" {
-		return fmt.Errorf("-db is required")
+	if err := requireDB(dbFile); err != nil {
+		return err
 	}
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
@@ -47,7 +46,7 @@ func cmdLinearSync(args []string) error {
 	defer store.Close()
 
 	return syncer.Run(context.Background(), client, store, syncer.Options{
-		Teams:      teams,
+		Teams:      *teams,
 		AllTeams:   *allTeams,
 		FullReload: *fullReload,
 	})
@@ -55,7 +54,7 @@ func cmdLinearSync(args []string) error {
 
 func cmdLinearTeams(args []string) error {
 	cmd := flag.NewFlagSet("linear teams", flag.ExitOnError)
-	configFile := cmd.String("config", "", "path to a YAML config file supplying flag values (CLI flags override)")
+	configFile := addConfigFlag(cmd)
 	cmd.Parse(args)
 
 	if err := util.ApplyConfig(cmd, *configFile); err != nil {

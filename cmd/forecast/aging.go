@@ -9,29 +9,27 @@ import (
 	"time"
 
 	"forecasting/internal/aging"
-	"forecasting/internal/linear"
 	"forecasting/internal/sqlite"
 	"forecasting/internal/util"
 )
 
 func cmdAging(args []string) error {
 	cmd := flag.NewFlagSet("aging", flag.ExitOnError)
-	dbFile := cmd.String("db", "", "path to SQLite database")
+	dbFile := addDBFlag(cmd)
 	sampleStartStr := cmd.String("sample-start", "", "start of completed-issue window (YYYY-MM-DD, default: today minus 3 months)")
 	sampleEndStr := cmd.String("sample-end", "", "end of completed-issue window (YYYY-MM-DD, default: today)")
 	format := cmd.String("format", "text", "output format: text, json, html")
 	minCycleTimeStr := cmd.String("min-cycle-time", "", "exclude completed issues with cycle time below this duration (e.g. 5m, 1h, 1d)")
-	var teams linear.KeyList
-	cmd.Var(&teams, "teams", "comma-separated team keys to filter by (e.g. DATA,PLT); default: all teams")
-	configFile := cmd.String("config", "", "path to a YAML config file supplying flag values (CLI flags override)")
+	teams := addTeamsFlag(cmd, "comma-separated team keys to filter by (e.g. DATA,PLT); default: all teams")
+	configFile := addConfigFlag(cmd)
 	cmd.Parse(args)
 
 	if err := util.ApplyConfig(cmd, *configFile); err != nil {
 		return err
 	}
 
-	if *dbFile == "" {
-		return fmt.Errorf("-db is required")
+	if err := requireDB(dbFile); err != nil {
+		return err
 	}
 
 	var minCycleTime time.Duration
@@ -67,7 +65,7 @@ func cmdAging(args []string) error {
 		return fmt.Errorf("-sample-start must be before -sample-end")
 	}
 
-	opts := aging.Options{Teams: teams, SampleStart: sampleStart, SampleEnd: sampleEnd, MinCycleTime: minCycleTime}
+	opts := aging.Options{Teams: *teams, SampleStart: sampleStart, SampleEnd: sampleEnd, MinCycleTime: minCycleTime}
 
 	store, err := sqlite.Open(*dbFile)
 	if err != nil {
