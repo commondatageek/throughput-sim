@@ -29,10 +29,19 @@ type Options struct {
 	FullReload bool
 }
 
+// client is the subset of *linear.Client that Run needs. It exists as a test
+// seam local to this package (not the source abstraction the original design
+// deliberately avoided) so Run can be exercised against a stub instead of the
+// real Linear API. *linear.Client satisfies it.
+type client interface {
+	Fetch(ctx context.Context, updatedSince time.Time, teamKeys []string) ([]linear.Issue, error)
+	ListTeams(ctx context.Context) ([]linear.Team, error)
+}
+
 // Run syncs issues from the Linear API into store according to opts.
 // It uses slog.Default() for progress logging; configure the default logger
 // before calling if you want structured output.
-func Run(ctx context.Context, client *linear.Client, store *sqlite.Store, opts Options) error {
+func Run(ctx context.Context, client client, store *sqlite.Store, opts Options) error {
 	if opts.AllTeams && len(opts.Teams) > 0 {
 		return fmt.Errorf("-teams and -all-teams are mutually exclusive")
 	}
