@@ -79,8 +79,7 @@ func TestApplyConfig(t *testing.T) {
 	t.Run("populates_unset_flags", func(t *testing.T) {
 		fs := newTestFlagSet()
 		fs.Parse([]string{})
-		path := writeYAML(t, "engineers: 7\nwhole-team: false\n")
-		if err := ApplyConfig(fs, path); err != nil {
+		if err := applyConfig(fs, map[string]any{"engineers": 7, "whole-team": false}); err != nil {
 			t.Fatal(err)
 		}
 		got := fs.Lookup("engineers").Value.String()
@@ -92,8 +91,7 @@ func TestApplyConfig(t *testing.T) {
 	t.Run("cli_flag_not_overridden_by_config", func(t *testing.T) {
 		fs := newTestFlagSet()
 		fs.Parse([]string{"-engineers", "2"})
-		path := writeYAML(t, "engineers: 9\n")
-		if err := ApplyConfig(fs, path); err != nil {
+		if err := applyConfig(fs, map[string]any{"engineers": 9}); err != nil {
 			t.Fatal(err)
 		}
 		got := fs.Lookup("engineers").Value.String()
@@ -105,21 +103,60 @@ func TestApplyConfig(t *testing.T) {
 	t.Run("config_set_flag_reports_as_set", func(t *testing.T) {
 		fs := newTestFlagSet()
 		fs.Parse([]string{})
-		path := writeYAML(t, "engineers: 5\n")
-		if err := ApplyConfig(fs, path); err != nil {
+		if err := applyConfig(fs, map[string]any{"engineers": 5}); err != nil {
 			t.Fatal(err)
 		}
 		if !isFlagSet(fs, "engineers") {
-			t.Error("isFlagSet(engineers) should be true after ApplyConfig")
+			t.Error("isFlagSet(engineers) should be true after applyConfig")
 		}
 	})
 
 	t.Run("unknown_key_errors", func(t *testing.T) {
 		fs := newTestFlagSet()
 		fs.Parse([]string{})
-		path := writeYAML(t, "enginers: 4\n") // typo
-		if err := ApplyConfig(fs, path); err == nil {
+		if err := applyConfig(fs, map[string]any{"enginers": 4}); err == nil {
 			t.Error("expected error for unknown key, got nil")
+		}
+	})
+
+	t.Run("joins_multiple_key_errors", func(t *testing.T) {
+		fs := newTestFlagSet()
+		fs.Parse([]string{})
+		err := applyConfig(fs, map[string]any{"enginers": 4, "wole-team": true})
+		if err == nil {
+			t.Fatal("expected error for unknown keys, got nil")
+		}
+		msg := err.Error()
+		if !strings.Contains(msg, "enginers") {
+			t.Errorf("error %q missing key %q", msg, "enginers")
+		}
+		if !strings.Contains(msg, "wole-team") {
+			t.Errorf("error %q missing key %q", msg, "wole-team")
+		}
+	})
+
+	t.Run("yaml_list_parses_into_commaList", func(t *testing.T) {
+		fs := newTestFlagSet()
+		fs.Parse([]string{})
+		if err := applyConfig(fs, map[string]any{"percentile": []any{5, 25, 50}}); err != nil {
+			t.Fatal(err)
+		}
+		got := fs.Lookup("percentile").Value.String()
+		if got != "5,25,50" {
+			t.Errorf("percentile = %q, want %q", got, "5,25,50")
+		}
+	})
+
+	t.Run("config_key_skipped", func(t *testing.T) {
+		fs := newTestFlagSet()
+		fs.String("config", "", "")
+		fs.Parse([]string{})
+		if err := applyConfig(fs, map[string]any{"config": "some-other.yaml", "engineers": 6}); err != nil {
+			t.Fatal(err)
+		}
+		got := fs.Lookup("engineers").Value.String()
+		if got != "6" {
+			t.Errorf("engineers = %q, want %q", got, "6")
 		}
 	})
 
@@ -139,19 +176,6 @@ func TestApplyConfig(t *testing.T) {
 		}
 	})
 
-	t.Run("yaml_list_parses_into_commaList", func(t *testing.T) {
-		fs := newTestFlagSet()
-		fs.Parse([]string{})
-		path := writeYAML(t, "percentile: [5, 25, 50]\n")
-		if err := ApplyConfig(fs, path); err != nil {
-			t.Fatal(err)
-		}
-		got := fs.Lookup("percentile").Value.String()
-		if got != "5,25,50" {
-			t.Errorf("percentile = %q, want %q", got, "5,25,50")
-		}
-	})
-
 	t.Run("comma_string_parses_into_commaList", func(t *testing.T) {
 		fs := newTestFlagSet()
 		fs.Parse([]string{})
@@ -162,20 +186,6 @@ func TestApplyConfig(t *testing.T) {
 		got := fs.Lookup("percentile").Value.String()
 		if got != "5,25,50" {
 			t.Errorf("percentile = %q, want %q", got, "5,25,50")
-		}
-	})
-
-	t.Run("config_key_skipped", func(t *testing.T) {
-		fs := newTestFlagSet()
-		fs.String("config", "", "")
-		fs.Parse([]string{})
-		path := writeYAML(t, "config: some-other.yaml\nengineers: 6\n")
-		if err := ApplyConfig(fs, path); err != nil {
-			t.Fatal(err)
-		}
-		got := fs.Lookup("engineers").Value.String()
-		if got != "6" {
-			t.Errorf("engineers = %q, want %q", got, "6")
 		}
 	})
 }

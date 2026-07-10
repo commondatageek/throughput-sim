@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/csv"
 	"flag"
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -138,37 +140,59 @@ func cmdSimBacktest(args []string) error {
 		Seed:        seed,
 	})
 
+	today := now.Truncate(24 * time.Hour)
+
 	switch *format {
 	case "csv":
-		return printBacktestCSV(rows)
+		return printBacktestCSV(rows, today)
 	default:
 		label := simulate.ModeLabel(mode, sf.Team, *sf.Engineers)
 		scope := *project
 		if *milestone != "" {
 			scope += " / " + *milestone
 		}
-		printBacktestText(rows, scope, label, len(issues), startDate, sampleStartDate, sampleEndDate)
+		printBacktestText(rows, scope, label, len(issues), startDate, sampleStartDate, sampleEndDate, today)
 	}
 	return nil
 }
 
-func printBacktestText(rows []simulate.BacktestRow, scope, label string, total int, startDate, sampleStart, sampleEnd time.Time) {
+func printBacktestText(rows []simulate.BacktestRow, scope, label string, total int, startDate, sampleStart, sampleEnd, today time.Time) {
 	fmt.Printf("Backtest: %s (%d issues, %s)\n", scope, total, label)
 	fmt.Printf("Start date: %s  Sample window: %s – %s\n\n",
 		startDate.Format("2006-01-02"), sampleStart.Format("2006-01-02"), sampleEnd.Format("2006-01-02"))
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "DATE\tCOMPLETED\tREMAINING\tPROB")
+	// Format the header and every row through tabwriter in one pass so column
+	// widths stay consistent; the projected/today divider is spliced into the
+	// already-aligned output afterward, since a line with no tab-separated
+	// cells would otherwise make tabwriter start a new column block.
+	var buf bytes.Buffer
+	tw := tabwriter.NewWriter(&buf, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "DATE\tCOMPLETED\tREMAINING\tPROB")
 	for _, r := range rows {
-		fmt.Fprintf(w, "%s\t%d\t%d\t%.1f%%\n",
+		fmt.Fprintf(tw, "%s\t%d\t%d\t%.1f%%\n",
 			r.Date.Format("2006-01-02"), r.Completed, r.Remaining, r.Prob)
 	}
-	w.Flush()
+	tw.Flush()
+
+	lines := strings.Split(strings.TrimSuffix(buf.String(), "\n"), "\n")
+	dividerLine := fmt.Sprintf("---- today: %s — rows below are projected (assuming no further completions) ----",
+		today.Format("2006-01-02"))
+	dividerIdx := -1
+	for i, r := range rows {
+		if r.Date.After(today) {
+			dividerIdx = i + 1 // +1 to account for the header line
+			break
+		}
+	}
+	if dividerIdx >= 0 {
+		lines = append(lines[:dividerIdx], append([]string{dividerLine}, lines[dividerIdx:]...)...)
+	}
+	fmt.Println(strings.Join(lines, "\n"))
 }
 
-func printBacktestCSV(rows []simulate.BacktestRow) error {
+func printBacktestCSV(rows []simulate.BacktestRow, today time.Time) error {
 	w := csv.NewWriter(os.Stdout)
-	if err := w.Write([]string{"date", "completed", "remaining", "probability"}); err != nil {
+	if err := w.Write([]string{"date", "completed", "remaining", "probability", "projected"}); err != nil {
 		return err
 	}
 	for _, r := range rows {
@@ -177,6 +201,7 @@ func printBacktestCSV(rows []simulate.BacktestRow) error {
 			strconv.Itoa(r.Completed),
 			strconv.Itoa(r.Remaining),
 			strconv.FormatFloat(r.Prob, 'f', 2, 64),
+			strconv.FormatBool(r.Date.After(today)),
 		}); err != nil {
 			return err
 		}
