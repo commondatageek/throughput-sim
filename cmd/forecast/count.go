@@ -69,6 +69,10 @@ func loadCountProjects(dbPath string, opts counts.Options) ([]counts.Project, in
 	}
 	multiTeam := len(allTeams) > 1
 
+	if msg := blendingTeamsWarning(opts.Teams, allTeams); msg != "" {
+		fmt.Fprintln(os.Stderr, msg)
+	}
+
 	countRows, err := store.NotCompletedCounts(ctx, opts.Teams)
 	if err != nil {
 		return nil, 0, false, err

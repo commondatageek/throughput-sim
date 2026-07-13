@@ -75,6 +75,10 @@ func cmdAging(args []string) error {
 
 	ctx := context.Background()
 
+	if err := warnIfBlendingTeams(ctx, store, opts.Teams); err != nil {
+		return err
+	}
+
 	completed, err := store.CompletedBetween(ctx, opts.SampleStart, opts.SampleEnd, nil, opts.Teams)
 	if err != nil {
 		return fmt.Errorf("query completed: %w", err)

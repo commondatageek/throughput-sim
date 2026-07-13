@@ -194,6 +194,40 @@ func requireDB(db *string) error {
 	return nil
 }
 
+// warnIfBlendingTeams warns on stderr when no -teams filter was given but the
+// store holds more than one team, so the caller knows the report silently
+// blends every team's data together. A no-op when teams is non-empty (the user
+// scoped explicitly) or the store holds at most one team. Used by the read-only
+// report commands (count/aging/cfd); not linear sync, where an unset -teams is
+// the intended "sync every team" default rather than an accidental blend.
+func warnIfBlendingTeams(ctx context.Context, store *sqlite.Store, teams linear.TeamKeyList) error {
+	if len(teams) > 0 {
+		return nil
+	}
+	keys, err := store.DistinctTeamKeys(ctx)
+	if err != nil {
+		return err
+	}
+	if msg := blendingTeamsWarning(teams, keys); msg != "" {
+		fmt.Fprintln(os.Stderr, msg)
+	}
+	return nil
+}
+
+// blendingTeamsWarning returns the "blending across all teams" warning line, or
+// "" when no warning is warranted: either the user scoped explicitly (teams
+// non-empty) or the store holds at most one team (allTeams). Kept pure (no I/O)
+// so callers that already know the full team set — like count — can reuse the
+// exact message without a second DistinctTeamKeys query, and so it is unit
+// testable.
+func blendingTeamsWarning(teams linear.TeamKeyList, allTeams []string) string {
+	if len(teams) > 0 || len(allTeams) <= 1 {
+		return ""
+	}
+	return fmt.Sprintf("warning: no -teams filter given; blending data across all %d teams (%s)",
+		len(allTeams), strings.Join(allTeams, ", "))
+}
+
 // addConfigFlag registers the -config flag used by every subcommand.
 func addConfigFlag(fs *flag.FlagSet) *string {
 	return fs.String("config", "", "path to a YAML config file supplying flag values (CLI flags override)")
