@@ -20,7 +20,7 @@ import (
 type Options struct {
 	// Teams is the `-teams` flag: candidate team keys to sync, extending
 	// whatever teams already exist in the store. Mutually exclusive with AllTeams.
-	Teams linear.KeyList
+	Teams linear.TeamKeyList
 	// AllTeams is the `-all-teams` flag: expand the candidate set to every
 	// team the Linear API token can access. Mutually exclusive with Teams.
 	AllTeams bool
@@ -61,7 +61,7 @@ func Run(ctx context.Context, client client, store *sqlite.Store, opts Options) 
 		if err != nil {
 			return fmt.Errorf("list teams: %w", err)
 		}
-		candidates = make(linear.KeyList, 0, len(teamNodes))
+		candidates = make(linear.TeamKeyList, 0, len(teamNodes))
 		for _, t := range teamNodes {
 			candidates = append(candidates, t.Key)
 		}

@@ -20,7 +20,7 @@ const (
 // `forecast count` flag (and thus a `-config` YAML key of the same name).
 type Options struct {
 	// Teams is the `-teams` flag: team keys to filter by; empty means all teams.
-	Teams linear.KeyList
+	Teams linear.TeamKeyList
 	// Since is the `-updated-since` flag, resolved to a concrete date
 	// (default: today minus 3 months). Projects whose most recently updated
 	// issue predates it are dropped.

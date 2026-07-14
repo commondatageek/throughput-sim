@@ -3,19 +3,15 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	"embed"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"forecasting/internal/linear"
 
-	"github.com/pressly/goose/v3"
 	_ "modernc.org/sqlite"
 )
-
-//go:embed migrations/*.sql
-var migrationsFS embed.FS
 
 // Store is the concrete SQLite-backed issue store.
 // All SQL in this repo lives here.
@@ -23,7 +19,41 @@ type Store struct {
 	db *sql.DB
 }
 
-// Open opens (or creates) the SQLite database at path and runs any pending migrations.
+// schema is the full (and only) table definition. The store just replicates
+// Linear's own data, so rebuilding the database from scratch is trivial and
+// cheap; there's no history worth preserving across schema changes, so a
+// single idempotent CREATE IF NOT EXISTS replaces versioned migrations.
+const schema = `
+CREATE TABLE IF NOT EXISTS issues (
+    identifier              TEXT NOT NULL PRIMARY KEY,
+    title                   TEXT NOT NULL DEFAULT '',
+    assignee                TEXT,
+    team_key                TEXT NOT NULL DEFAULT '',
+    team_name               TEXT NOT NULL DEFAULT '',
+    project_id              TEXT,
+    project_name            TEXT,
+    project_milestone_id    TEXT,
+    project_milestone_name  TEXT,
+    state_type              TEXT NOT NULL DEFAULT '',
+    state_name              TEXT NOT NULL DEFAULT '',
+    created_at              DATETIME,
+    started_at              DATETIME,
+    completed_at            DATETIME,
+    canceled_at             DATETIME,
+    archived_at             DATETIME,
+    auto_archived_at        DATETIME,
+    added_to_project_at     DATETIME,
+    updated_at              DATETIME
+);
+
+CREATE INDEX IF NOT EXISTS idx_issues_team_key_updated_at ON issues (team_key, updated_at);
+CREATE INDEX IF NOT EXISTS idx_issues_completed_at        ON issues (completed_at);
+`
+
+// Open opens (or creates) the SQLite database at path and ensures the schema
+// exists. Since this always creates a missing file, it's meant for the
+// ingest path (`linear sync`), which legitimately seeds a brand-new database.
+// Read-only commands should use OpenExisting instead.
 func Open(path string) (*Store, error) {
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
@@ -36,17 +66,27 @@ func Open(path string) (*Store, error) {
 		return nil, fmt.Errorf("pragma: %w", err)
 	}
 
-	goose.SetBaseFS(migrationsFS)
-	if err := goose.SetDialect("sqlite3"); err != nil {
+	if _, err := db.Exec(schema); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("goose dialect: %w", err)
-	}
-	if err := goose.Up(db, "migrations"); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("migrate: %w", err)
+		return nil, fmt.Errorf("create schema: %w", err)
 	}
 
 	return &Store{db: db}, nil
+}
+
+// OpenExisting opens the SQLite database at path, first checking that the
+// file already exists. Use this for read-only commands (sim, count, aging,
+// cfd): since SQLite otherwise creates a missing file lazily, a typo'd or
+// wrong -db path would silently open an empty database and proceed rather
+// than failing.
+func OpenExisting(path string) (*Store, error) {
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("database %q does not exist", path)
+		}
+		return nil, fmt.Errorf("stat db %q: %w", path, err)
+	}
+	return Open(path)
 }
 
 // Close closes the underlying database connection.

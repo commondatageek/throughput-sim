@@ -67,13 +67,17 @@ func cmdAging(args []string) error {
 
 	opts := aging.Options{Teams: *teams, SampleStart: sampleStart, SampleEnd: sampleEnd, MinCycleTime: minCycleTime}
 
-	store, err := sqlite.Open(*dbFile)
+	store, err := sqlite.OpenExisting(*dbFile)
 	if err != nil {
 		return fmt.Errorf("open db: %w", err)
 	}
 	defer store.Close()
 
 	ctx := context.Background()
+
+	if err := warnIfBlendingTeams(ctx, store, opts.Teams); err != nil {
+		return err
+	}
 
 	completed, err := store.CompletedBetween(ctx, opts.SampleStart, opts.SampleEnd, nil, opts.Teams)
 	if err != nil {

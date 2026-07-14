@@ -57,15 +57,24 @@ func cmdCFD(args []string) error {
 
 	opts := cfd.Options{Teams: *teams, Start: windowStart, End: windowEnd}
 
-	store, err := sqlite.Open(*dbFile)
+	store, err := sqlite.OpenExisting(*dbFile)
 	if err != nil {
 		return fmt.Errorf("open db: %w", err)
 	}
 	defer store.Close()
 
-	raw, err := store.CFDIssues(context.Background(), opts.Teams)
+	ctx := context.Background()
+
+	if err := warnIfBlendingTeams(ctx, store, opts.Teams); err != nil {
+		return err
+	}
+
+	raw, err := store.CFDIssues(ctx, opts.Teams)
 	if err != nil {
 		return fmt.Errorf("query issues: %w", err)
+	}
+	if len(raw) == 0 {
+		fmt.Fprintln(os.Stderr, "warning: no issues found in the database for the given team filter")
 	}
 
 	var normalized []cfd.NormalizedIssue

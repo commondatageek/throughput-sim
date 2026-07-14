@@ -21,7 +21,7 @@ var htmlTemplate string
 // the same name).
 type Options struct {
 	// Teams is the `-teams` flag: team keys to filter by; empty means all teams.
-	Teams linear.KeyList
+	Teams linear.TeamKeyList
 	// Start is the `-start` flag, resolved to a concrete date (default: today
 	// minus 3 months).
 	Start time.Time

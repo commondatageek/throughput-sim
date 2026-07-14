@@ -52,7 +52,7 @@ func openTestStore(t *testing.T) *sqlite.Store {
 func TestRun_TeamsAndAllTeamsMutuallyExclusive(t *testing.T) {
 	store := openTestStore(t)
 	err := Run(context.Background(), &stubClient{}, store, Options{
-		Teams:    linear.KeyList{"ENG"},
+		Teams:    linear.TeamKeyList{"ENG"},
 		AllTeams: true,
 	})
 	if err == nil {
@@ -73,7 +73,7 @@ func TestRun_EmptyDBWithTeams_FullSync(t *testing.T) {
 	sc := &stubClient{issuesFor: map[string][]linear.Issue{
 		"ENG": {{Identifier: "ENG-1", TeamKey: "ENG", StateType: "completed"}},
 	}}
-	if err := Run(context.Background(), sc, store, Options{Teams: linear.KeyList{"ENG"}}); err != nil {
+	if err := Run(context.Background(), sc, store, Options{Teams: linear.TeamKeyList{"ENG"}}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if len(sc.fetchCalls) != 1 {
@@ -108,7 +108,7 @@ func TestRun_ExistingTeamIncremental_UsesWatermark(t *testing.T) {
 	sc := &stubClient{issuesFor: map[string][]linear.Issue{
 		"ENG": {{Identifier: "ENG-2", TeamKey: "ENG", StateType: "started"}},
 	}}
-	if err := Run(ctx, sc, store, Options{Teams: linear.KeyList{"ENG"}}); err != nil {
+	if err := Run(ctx, sc, store, Options{Teams: linear.TeamKeyList{"ENG"}}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if len(sc.fetchCalls) != 1 {
@@ -133,7 +133,7 @@ func TestRun_ExistingTeamFullReload_IgnoresWatermark(t *testing.T) {
 	}
 
 	sc := &stubClient{issuesFor: map[string][]linear.Issue{"ENG": nil}}
-	if err := Run(ctx, sc, store, Options{Teams: linear.KeyList{"ENG"}, FullReload: true}); err != nil {
+	if err := Run(ctx, sc, store, Options{Teams: linear.TeamKeyList{"ENG"}, FullReload: true}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if len(sc.fetchCalls) != 1 {
@@ -198,7 +198,7 @@ func TestRun_FetchErrorMidLoop_PriorTeamCommitted(t *testing.T) {
 			"DATA": errors.New("boom"),
 		},
 	}
-	err := Run(context.Background(), sc, store, Options{Teams: linear.KeyList{"ENG", "DATA"}})
+	err := Run(context.Background(), sc, store, Options{Teams: linear.TeamKeyList{"ENG", "DATA"}})
 	if err == nil {
 		t.Fatal("Run = nil, want error from DATA fetch failure")
 	}

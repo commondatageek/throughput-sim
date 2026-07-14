@@ -92,7 +92,7 @@ func cmdSimBacktest(args []string) error {
 	seed := resolveSeed(cmd, *sf.RandomSeed, now)
 
 	// Fetch the tracked issue set once.
-	store, err := sqlite.Open(*dbFile)
+	store, err := sqlite.OpenExisting(*dbFile)
 	if err != nil {
 		return fmt.Errorf("open db: %w", err)
 	}

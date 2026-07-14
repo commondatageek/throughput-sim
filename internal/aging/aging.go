@@ -18,7 +18,7 @@ import (
 // `-config` YAML key of the same name).
 type Options struct {
 	// Teams is the `-teams` flag: team keys to filter by; empty means all teams.
-	Teams linear.KeyList
+	Teams linear.TeamKeyList
 	// SampleStart is the `-sample-start` flag, resolved to a concrete date
 	// (default: today minus 3 months).
 	SampleStart time.Time
