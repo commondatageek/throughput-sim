@@ -11,6 +11,7 @@ import (
 
 	"forecasting/internal/linear"
 	"forecasting/internal/sqlite"
+	"forecasting/internal/util"
 )
 
 //go:embed template.html
@@ -31,7 +32,7 @@ type Options struct {
 
 // NormalizedIssue holds per-issue lifecycle event times clamped to be
 // monotonically non-decreasing. All times are truncated to day resolution
-// (midnight UTC). Zero means the event has not occurred.
+// (local midnight). Zero means the event has not occurred.
 type NormalizedIssue struct {
 	Arrival     time.Time
 	LeftBacklog time.Time
@@ -73,10 +74,7 @@ type FlowHealth struct {
 }
 
 func truncDay(t time.Time) time.Time {
-	if t.IsZero() {
-		return t
-	}
-	return t.UTC().Truncate(24 * time.Hour)
+	return util.LocalDay(t)
 }
 
 func clampMin(a, floor time.Time) time.Time {

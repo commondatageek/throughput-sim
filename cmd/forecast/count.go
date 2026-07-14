@@ -31,7 +31,7 @@ func cmdCount(args []string) error {
 		return err
 	}
 
-	since, err := time.Parse("2006-01-02", *updatedSince)
+	since, err := util.ParseDate(*updatedSince)
 	if err != nil {
 		return fmt.Errorf("invalid -updated-since %q (want YYYY-MM-DD): %w", *updatedSince, err)
 	}

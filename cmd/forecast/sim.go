@@ -40,7 +40,7 @@ func cmdSimItems(args []string) error {
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start date: %w", err)
 	}
-	now := time.Now().UTC()
+	now := time.Now()
 	endDate, err := resolveEndDate(cmd, *sf.SampleEnd, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
@@ -179,7 +179,7 @@ func cmdSimDays(args []string) error {
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start date: %w", err)
 	}
-	now := time.Now().UTC()
+	now := time.Now()
 	endDate, err := resolveEndDate(cmd, *sf.SampleEnd, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
@@ -288,7 +288,7 @@ func cmdSimProbability(args []string) error {
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start date: %w", err)
 	}
-	now := time.Now().UTC()
+	now := time.Now()
 	endDate, err := resolveEndDate(cmd, *sf.SampleEnd, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
@@ -308,7 +308,7 @@ func cmdSimProbability(args []string) error {
 		if !targetEnd.After(targetStart) {
 			return fmt.Errorf("-target-end-date must be after -target-start-date")
 		}
-		effectiveDays = int(targetEnd.Sub(targetStart).Hours()/24) + 1
+		effectiveDays = util.DayIndex(targetEnd, targetStart) + 1
 	}
 
 	loaded, err := loadPool(*dbFile, *sf.ExclusionsFile, sf.TypicalEngineers, startDate, endDate, *sf.WholeTeam)

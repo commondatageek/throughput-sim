@@ -66,7 +66,7 @@ func cmdSimBacktest(args []string) error {
 		return fmt.Errorf("invalid -target-end-date: %w", err)
 	}
 
-	now := time.Now().UTC()
+	now := time.Now()
 	sampleStartDate, err := util.ParseDate(*sf.SampleStart)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start: %w", err)
@@ -124,7 +124,7 @@ func cmdSimBacktest(args []string) error {
 		if startDate.IsZero() {
 			return fmt.Errorf("no started_at found in issue set; provide -replay-start-date explicitly")
 		}
-		startDate = startDate.UTC().Truncate(24 * time.Hour)
+		startDate = util.LocalDay(startDate)
 	}
 
 	if !targetDate.After(startDate) {
@@ -140,7 +140,7 @@ func cmdSimBacktest(args []string) error {
 		Seed:        seed,
 	})
 
-	today := now.Truncate(24 * time.Hour)
+	today := util.LocalDay(now)
 
 	switch *format {
 	case "csv":

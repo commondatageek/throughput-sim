@@ -41,7 +41,7 @@ func cmdAging(args []string) error {
 		minCycleTime = d
 	}
 
-	today := time.Now().UTC().Truncate(24 * time.Hour)
+	today := util.LocalDay(time.Now())
 
 	sampleEnd := today
 	if *sampleEndStr != "" {

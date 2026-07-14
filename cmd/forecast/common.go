@@ -135,7 +135,7 @@ func isFlagSet(fs *flag.FlagSet, name string) bool {
 
 // defaultDateRange returns a default date range of the last 6 months, formatted as YYYY-MM-DD.
 func defaultDateRange() (start, end string) {
-	now := time.Now().UTC()
+	now := time.Now()
 	return now.AddDate(0, -6, 0).Format("2006-01-02"), now.Format("2006-01-02")
 }
 
@@ -143,7 +143,7 @@ func defaultDateRange() (start, end string) {
 // the relative keywords today and tomorrow.
 func resolveRelativeDate(s string, now time.Time) (time.Time, error) {
 	y, m, d := now.Local().Date()
-	today := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+	today := time.Date(y, m, d, 0, 0, 0, 0, time.Local)
 	switch strings.ToLower(s) {
 	case "today":
 		return today, nil

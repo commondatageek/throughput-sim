@@ -8,8 +8,11 @@ import (
 	"forecasting/internal/simulate"
 )
 
+// day builds a local-midnight calendar date. Fixtures use time.Local (not UTC)
+// so they share the zone used by DaysBetween's local-day bucketing, keeping the
+// expected-value assertions correct regardless of the machine's timezone.
 func day(y int, m time.Month, d int) time.Time {
-	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+	return time.Date(y, m, d, 0, 0, 0, 0, time.Local)
 }
 
 // newSampleEndFlags returns a FlagSet defining the flags resolveEndDate and
@@ -26,7 +29,7 @@ func TestResolveEndDate(t *testing.T) {
 	start := day(2025, 1, 1)
 	// Mid-afternoon "now": the unset branch must return this verbatim so that
 	// simulate.DaysBetween counts today as a partial, inclusive slot (the +1 branch).
-	now := time.Date(2025, 1, 5, 14, 30, 0, 0, time.UTC)
+	now := time.Date(2025, 1, 5, 14, 30, 0, 0, time.Local)
 
 	// Unset -sample-end: defaults to now, today included as a partial slot.
 	fs := newSampleEndFlags()
@@ -60,7 +63,7 @@ func TestResolveEndDate(t *testing.T) {
 }
 
 func TestResolveSeed(t *testing.T) {
-	now := time.Date(2025, 1, 5, 14, 30, 0, 0, time.UTC)
+	now := time.Date(2025, 1, 5, 14, 30, 0, 0, time.Local)
 
 	// Unset -random-seed: time-based seed derived from now.
 	fs := newSampleEndFlags()

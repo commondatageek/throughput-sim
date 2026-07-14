@@ -6,14 +6,17 @@ import (
 	"time"
 )
 
+// day builds a local-midnight calendar date. Fixtures use time.Local (not UTC)
+// so they share the same zone as the day-bucketing under test, keeping the
+// expected-value assertions correct regardless of the machine's timezone.
 func day(y int, m time.Month, d int) time.Time {
-	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+	return time.Date(y, m, d, 0, 0, 0, 0, time.Local)
 }
 
 // at returns a Completion for engineer eng on the given calendar day, with a
 // deliberate mid-day time to confirm time-of-day is truncated away.
 func at(eng string, y int, m time.Month, d int) Completion {
-	return Completion{Engineer: eng, CompletedAt: time.Date(y, m, d, 14, 30, 0, 0, time.UTC)}
+	return Completion{Engineer: eng, CompletedAt: time.Date(y, m, d, 14, 30, 0, 0, time.Local)}
 }
 
 func TestFilterInvalid_SkipsMalformed(t *testing.T) {
@@ -76,7 +79,7 @@ func TestBuildPool_PartialNowEndDayCountsToday(t *testing.T) {
 	// slot at idx == totalDays-1. A completion landing on that final partial day
 	// must be counted, not silently dropped as out-of-range.
 	start := day(2025, 1, 1)
-	now := time.Date(2025, 1, 5, 14, 30, 0, 0, time.UTC) // partial last day
+	now := time.Date(2025, 1, 5, 14, 30, 0, 0, time.Local) // partial last day
 	records := []Completion{
 		at("alice", 2025, 1, 1), // idx 0
 		at("alice", 2025, 1, 5), // idx 4 == totalDays-1, the partial "today"
@@ -207,7 +210,7 @@ func TestDaysBetween(t *testing.T) {
 	}{
 		{"whole days, midnight end excludes that day", day(2025, 1, 1), day(2025, 1, 11), 10},
 		{"partial end day gets one inclusive slot",
-			day(2025, 1, 1), time.Date(2025, 1, 5, 12, 0, 0, 0, time.UTC), 5},
+			day(2025, 1, 1), time.Date(2025, 1, 5, 12, 0, 0, 0, time.Local), 5},
 		{"midnight end day excluded", day(2025, 1, 1), day(2025, 1, 5), 4},
 	}
 	for _, c := range cases {
