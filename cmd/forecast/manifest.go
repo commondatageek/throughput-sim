@@ -57,17 +57,17 @@ type FlagRecord struct {
 }
 
 type Resolved struct {
-	Mode        string         `json:"mode"`
-	ModeLabel   string         `json:"mode_label"`
-	Engineers   int            `json:"engineers"`
-	Team        []string       `json:"team"`
-	Include     []string       `json:"include"`
-	WholeTeam   bool           `json:"whole_team"`
-	Seed        int64          `json:"seed"`
-	SampleStart string         `json:"sample_start"`
-	SampleEnd   string         `json:"sample_end"`
-	TotalDays   int            `json:"total_days"`
-	Extra       map[string]any `json:"extra,omitempty"`
+	Mode             string         `json:"mode"`
+	ModeLabel        string         `json:"mode_label"`
+	Engineers        int            `json:"engineers"`
+	Team             []string       `json:"team"`
+	TypicalEngineers []string       `json:"typical_engineers"`
+	WholeTeam        bool           `json:"whole_team"`
+	Seed             int64          `json:"seed"`
+	SampleStart      string         `json:"sample_start"`
+	SampleEnd        string         `json:"sample_end"`
+	TotalDays        int            `json:"total_days"`
+	Extra            map[string]any `json:"extra,omitempty"`
 }
 
 type DataSection struct {
@@ -194,23 +194,23 @@ func issueTime(t time.Time) string {
 // manifestInputs is the single shared parameter bag the sim subcommands
 // fill in to produce a Manifest.
 type manifestInputs struct {
-	Subcommand     string
-	Cmd            *flag.FlagSet
-	Mode           simulate.Mode
-	Team           []string
-	Include        []string
-	Engineers      int
-	WholeTeam      bool
-	Seed           int64
-	SampleStart    time.Time
-	SampleEnd      time.Time
-	DBPath         string
-	ExclusionsPath string
-	Exclusions     simulate.Exclusions
-	Pool           *simulate.SamplePool
-	Issues         []linear.Issue
-	Skipped        int
-	Extra          map[string]any
+	Subcommand       string
+	Cmd              *flag.FlagSet
+	Mode             simulate.Mode
+	Team             []string
+	TypicalEngineers []string
+	Engineers        int
+	WholeTeam        bool
+	Seed             int64
+	SampleStart      time.Time
+	SampleEnd        time.Time
+	DBPath           string
+	ExclusionsPath   string
+	Exclusions       simulate.Exclusions
+	Pool             *simulate.SamplePool
+	Issues           []linear.Issue
+	Skipped          int
+	Extra            map[string]any
 }
 
 // newManifest assembles a Manifest from manifestInputs. It is pure (no file
@@ -270,17 +270,17 @@ func newManifest(in manifestInputs) *Manifest {
 		Invocation:    Invocation{Subcommand: in.Subcommand, Args: os.Args, WorkingDir: wd},
 		Flags:         flags,
 		Resolved: Resolved{
-			Mode:        modeName(in.Mode),
-			ModeLabel:   simulate.ModeLabel(in.Mode, in.Team, in.Engineers),
-			Engineers:   in.Engineers,
-			Team:        in.Team,
-			Include:     in.Include,
-			WholeTeam:   in.WholeTeam,
-			Seed:        in.Seed,
-			SampleStart: in.SampleStart.UTC().Format(time.RFC3339),
-			SampleEnd:   in.SampleEnd.UTC().Format(time.RFC3339),
-			TotalDays:   simulate.DaysBetween(in.SampleStart, in.SampleEnd),
-			Extra:       in.Extra,
+			Mode:             modeName(in.Mode),
+			ModeLabel:        simulate.ModeLabel(in.Mode, in.Team, in.Engineers),
+			Engineers:        in.Engineers,
+			Team:             in.Team,
+			TypicalEngineers: in.TypicalEngineers,
+			WholeTeam:        in.WholeTeam,
+			Seed:             in.Seed,
+			SampleStart:      in.SampleStart.UTC().Format(time.RFC3339),
+			SampleEnd:        in.SampleEnd.UTC().Format(time.RFC3339),
+			TotalDays:        simulate.DaysBetween(in.SampleStart, in.SampleEnd),
+			Extra:            in.Extra,
 		},
 		Data: DataSection{
 			DB:                dbFingerprint(in.DBPath),

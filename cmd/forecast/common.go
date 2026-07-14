@@ -70,25 +70,26 @@ func issuesToCompletions(issues []linear.Issue) []simulate.Completion {
 	return records
 }
 
-// warnUnmatchedIncludes logs a warning for any name in includeEngineers that
-// doesn't appear in seen, which usually indicates a typo in -include.
-func warnUnmatchedIncludes(includeEngineers []string, seen map[string]bool) {
-	for _, name := range includeEngineers {
+// warnUnmatchedTypicalEngineers logs a warning for any name in typicalEngineers
+// that doesn't appear in seen, which usually indicates a typo in
+// -typical-engineers.
+func warnUnmatchedTypicalEngineers(typicalEngineers []string, seen map[string]bool) {
+	for _, name := range typicalEngineers {
 		if !seen[name] {
-			fmt.Fprintf(os.Stderr, "WARNING: -include engineer %q not found in data\n", name)
+			fmt.Fprintf(os.Stderr, "WARNING: -typical-engineers engineer %q not found in data\n", name)
 		}
 	}
 }
 
 // loadPool builds a SamplePool by querying the SQLite store.
-func loadPool(dbPath, exclusionsFile string, includeEngineers []string, startDate, endDate time.Time, wholeTeam bool) (poolData, error) {
+func loadPool(dbPath, exclusionsFile string, typicalEngineers []string, startDate, endDate time.Time, wholeTeam bool) (poolData, error) {
 	store, err := sqlite.OpenExisting(dbPath)
 	if err != nil {
 		return poolData{}, fmt.Errorf("open db: %w", err)
 	}
 	defer store.Close()
 
-	issues, err := store.CompletedBetween(context.Background(), startDate, endDate, includeEngineers, nil)
+	issues, err := store.CompletedBetween(context.Background(), startDate, endDate, typicalEngineers, nil)
 	if err != nil {
 		return poolData{}, fmt.Errorf("querying db: %w", err)
 	}
@@ -97,7 +98,7 @@ func loadPool(dbPath, exclusionsFile string, includeEngineers []string, startDat
 	for _, it := range issues {
 		engineerSeen[it.Assignee] = true
 	}
-	warnUnmatchedIncludes(includeEngineers, engineerSeen)
+	warnUnmatchedTypicalEngineers(typicalEngineers, engineerSeen)
 
 	exc, err := simulate.LoadExclusions(exclusionsFile)
 	if err != nil {
@@ -134,7 +135,7 @@ func isFlagSet(fs *flag.FlagSet, name string) bool {
 
 // defaultDateRange returns a default date range of the last 6 months, formatted as YYYY-MM-DD.
 func defaultDateRange() (start, end string) {
-	now := time.Now().UTC()
+	now := time.Now()
 	return now.AddDate(0, -6, 0).Format("2006-01-02"), now.Format("2006-01-02")
 }
 
@@ -142,7 +143,7 @@ func defaultDateRange() (start, end string) {
 // the relative keywords today and tomorrow.
 func resolveRelativeDate(s string, now time.Time) (time.Time, error) {
 	y, m, d := now.Local().Date()
-	today := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+	today := time.Date(y, m, d, 0, 0, 0, 0, time.Local)
 	switch strings.ToLower(s) {
 	case "today":
 		return today, nil
@@ -247,16 +248,16 @@ func addTeamsFlag(fs *flag.FlagSet, usage string) *linear.TeamKeyList {
 // subcommands (items/days/probability/backtest). -items/-days/-percentile/
 // -manifest differ per command and are declared there instead.
 type simFlags struct {
-	ExclusionsFile *string
-	Engineers      *int
-	WholeTeam      *bool
-	Simulations    *int
-	Goroutines     *int
-	SampleStart    *string
-	SampleEnd      *string
-	RandomSeed     *int64
-	Include        stringList
-	Team           stringList
+	ExclusionsFile   *string
+	Engineers        *int
+	WholeTeam        *bool
+	Simulations      *int
+	Goroutines       *int
+	SampleStart      *string
+	SampleEnd        *string
+	RandomSeed       *int64
+	TypicalEngineers stringList
+	Team             stringList
 }
 
 // addSimFlags registers simFlags's block onto fs and returns the bundle. The
@@ -274,7 +275,7 @@ func addSimFlags(fs *flag.FlagSet) *simFlags {
 	sf.SampleStart = fs.String("sample-start", defaultStart, "sample data start date (YYYY-MM-DD)")
 	sf.SampleEnd = fs.String("sample-end", defaultEnd, "sample data end date (YYYY-MM-DD)")
 	sf.RandomSeed = fs.Int64("random-seed", 0, "seed for the random number generator (default: time-based, non-deterministic)")
-	fs.Var(&sf.Include, "include", "comma-separated list of engineer names to include (default: all)")
+	fs.Var(&sf.TypicalEngineers, "typical-engineers", "comma-separated list of the team's typical engineers to build the sample pool from (default: all)")
 	fs.Var(&sf.Team, "team", "comma-separated list of specific engineer names to model individually")
 	return sf
 }

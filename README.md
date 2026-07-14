@@ -86,7 +86,7 @@ forecast sim items -db linear.db -team alice,bob -days 30
 | `-sample-end` | now | sample data end date (YYYY-MM-DD) |
 | `-random-seed` | time-based | seed for the random number generator |
 | `-percentile` | `5,25,50,75,95` | comma-separated percentiles to output |
-| `-include` | all | comma-separated list of engineer names to include |
+| `-typical-engineers` | all | comma-separated list of the team's typical engineers to build the sample pool from |
 | `-team` | | comma-separated list of specific engineer names to model individually |
 | `-manifest` | | write a run-provenance JSON manifest to this path (`-` for stdout) |
 | `-config` | | path to a YAML config file supplying flag values (CLI flags override) |
@@ -209,7 +209,7 @@ YAML file, applied immediately after flag parsing. Precedence is **CLI flag
 
 - Keys equal flag names exactly as passed on the command line (e.g.
   `-sample-end` → `sample-end`).
-- List flags (`-teams`, `-team`, `-include`, `-percentile`, `-items`) take a
+- List flags (`-teams`, `-team`, `-typical-engineers`, `-percentile`, `-items`) take a
   YAML sequence, joined into the same comma-separated string the flag
   itself accepts: `teams: [ENG, DATA]` behaves identically to
   `-teams ENG,DATA`. A plain string (`teams: "ENG,DATA"`) also works.

@@ -1,6 +1,10 @@
 package simulate
 
-import "time"
+import (
+	"time"
+
+	"forecasting/internal/util"
+)
 
 // BacktestItem is the neutral per-issue record the backtest needs: just the
 // timestamps. The cmd layer converts source-specific records (e.g. linear.Issue)
@@ -71,7 +75,7 @@ func RunBacktest(pool *SamplePool, items []BacktestItem, startDate, targetDate t
 	var rows []BacktestRow
 	for d := startDate; !d.After(targetDate); d = d.AddDate(0, 0, 1) {
 		completed, remaining := CountAsOf(items, d)
-		daysToTarget := int(targetDate.Sub(d).Hours()/24) + 1
+		daysToTarget := util.DayIndex(targetDate, d) + 1
 
 		var prob float64
 		if remaining == 0 {

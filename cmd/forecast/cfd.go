@@ -31,7 +31,7 @@ func cmdCFD(args []string) error {
 		return err
 	}
 
-	today := time.Now().UTC().Truncate(24 * time.Hour)
+	today := util.LocalDay(time.Now())
 
 	windowEnd := today
 	if *endStr != "" {

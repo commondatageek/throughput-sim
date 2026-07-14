@@ -8,6 +8,8 @@ import (
 	"os"
 	"sort"
 	"time"
+
+	"forecasting/internal/util"
 )
 
 // WholeTeamKey is the SamplePool.PerEngineer key used in whole-team mode,
@@ -95,8 +97,8 @@ func (p *SamplePool) GetCombinedSamples() []int {
 // fully excluded. If end carries a time-of-day (e.g. it's "now"), the day
 // it falls on is partially in range, so it gets one inclusive slot.
 func DaysBetween(start, end time.Time) int {
-	endDay := end.Truncate(24 * time.Hour)
-	days := int(endDay.Sub(start).Hours() / 24)
+	endDay := util.LocalDay(end)
+	days := util.DayIndex(endDay, start)
 	if !end.Equal(endDay) {
 		days++
 	}
@@ -122,11 +124,11 @@ func BuildPool(records []Completion, exc Exclusions, startDate, endDate time.Tim
 	// Build the global excluded day-index set.
 	globalExcluded := make(map[int]bool)
 	for _, ds := range exc.Global {
-		t, err := time.ParseInLocation("2006-01-02", ds, time.UTC)
+		t, err := util.ParseDate(ds)
 		if err != nil {
 			continue
 		}
-		idx := int(t.Sub(startDate).Hours() / 24)
+		idx := util.DayIndex(t, startDate)
 		globalExcluded[idx] = true
 	}
 
@@ -135,8 +137,8 @@ func BuildPool(records []Completion, exc Exclusions, startDate, endDate time.Tim
 	}
 	engineers := make(map[string]*engData)
 	for _, r := range records {
-		t := r.CompletedAt.UTC().Truncate(24 * time.Hour)
-		idx := int(t.Sub(startDate).Hours() / 24)
+		t := util.LocalDay(r.CompletedAt)
+		idx := util.DayIndex(t, startDate)
 		if idx < 0 || idx >= totalDays {
 			continue
 		}
@@ -171,11 +173,11 @@ func BuildPool(records []Completion, exc Exclusions, startDate, endDate time.Tim
 				excluded[k] = true
 			}
 			for _, ds := range exc.Engineers[name] {
-				t, err := time.ParseInLocation("2006-01-02", ds, time.UTC)
+				t, err := util.ParseDate(ds)
 				if err != nil {
 					continue
 				}
-				idx := int(t.Sub(startDate).Hours() / 24)
+				idx := util.DayIndex(t, startDate)
 				excluded[idx] = true
 			}
 			var engineerSamples []int

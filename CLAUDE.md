@@ -71,7 +71,7 @@ All commands live in the single `forecast` binary. Run `forecast` with no argume
 Every subcommand accepts `-config <file.yaml>`, applied via `util.ApplyConfig` (`internal/util/config.go`) immediately after `fs.Parse`. Precedence is **CLI flag > config file > built-in default**. Rules:
 
 - **Keys equal flag names**, exactly as passed on the command line (e.g. `-sample-end` → `sample-end`, `-random-seed` → `random-seed`).
-- **List flags** (`-teams`, `-team`, `-include`, `-percentile`, `-items`) take a YAML sequence, joined into the same comma-separated string the flag itself accepts: `teams: [ENG, DATA]` behaves identically to `-teams ENG,DATA`. A plain string (`teams: "ENG,DATA"`) works too.
+- **List flags** (`-teams`, `-team`, `-typical-engineers`, `-percentile`, `-items`) take a YAML sequence, joined into the same comma-separated string the flag itself accepts: `teams: [ENG, DATA]` behaves identically to `-teams ENG,DATA`. A plain string (`teams: "ENG,DATA"`) works too.
 - **Presence-sensitive flags behave as if passed on the CLI.** Config values are applied via `fs.Set`, so `sample-end` or `random-seed` set only in a config file still counts as "explicitly set" for `resolveEndDate`/`resolveSeed` — e.g. a `random-seed: 42` in config pins the seed exactly like `-random-seed 42` would, rather than falling back to the time-based default.
 - The `config` key itself is reserved/ignored inside the file (prevents self-reference).
 - One config file's keys are shared by exactly one command's `FlagSet` — there's no per-command sectioning (a `sim items` config and a `count` config are separate files); see Stage 4's non-goal on a shared multi-command file.
