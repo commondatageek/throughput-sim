@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log/slog"
 	"os"
 
 	"forecasting/internal/linear"
@@ -29,8 +28,6 @@ func cmdLinearSync(args []string) error {
 	if err := requireDB(dbFile); err != nil {
 		return err
 	}
-
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
 	apiKey, err := linear.GetAPIKey()
 	if err != nil {
