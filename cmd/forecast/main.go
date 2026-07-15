@@ -27,6 +27,7 @@ var topCommands = []command{
 	{Name: "aging", Summary: "WIP-age and cycle-time report.", Run: cmdAging},
 	{Name: "cfd", Summary: "Cumulative flow diagram.", Run: cmdCFD},
 	{Name: "count", Summary: "Count of non-terminal issues, grouped by project.", Run: cmdCount},
+	{Name: "version", Summary: "Print version and build info.", Run: cmdVersion},
 }
 
 func usage() {
