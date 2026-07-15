@@ -7,10 +7,10 @@ package syncer
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"forecasting/internal/linear"
+	"forecasting/internal/logx"
 	"forecasting/internal/sqlite"
 )
 
@@ -39,8 +39,7 @@ type client interface {
 }
 
 // Run syncs issues from the Linear API into store according to opts.
-// It uses slog.Default() for progress logging; configure the default logger
-// before calling if you want structured output.
+// It logs progress via internal/logx.
 func Run(ctx context.Context, client client, store *sqlite.Store, opts Options) error {
 	if opts.AllTeams && len(opts.Teams) > 0 {
 		return fmt.Errorf("-teams and -all-teams are mutually exclusive")
@@ -80,16 +79,16 @@ func Run(ctx context.Context, client client, store *sqlite.Store, opts Options) 
 		var since time.Time
 		if full {
 			if exists {
-				slog.Info("full sync (full reload)", "team", key)
+				logx.Infof("full sync (full reload): team=%s", key)
 			} else {
-				slog.Info("full sync (new team)", "team", key)
+				logx.Infof("full sync (new team): team=%s", key)
 			}
 		} else {
 			since, err = store.LatestUpdatedAtForTeam(ctx, key)
 			if err != nil {
 				return fmt.Errorf("watermark for %s: %w", key, err)
 			}
-			slog.Info("incremental sync", "team", key, "since", since)
+			logx.Infof("incremental sync: team=%s since=%s", key, since.Format(time.RFC3339))
 		}
 
 		issues, err := client.Fetch(ctx, since, []string{key})
@@ -101,7 +100,7 @@ func Run(ctx context.Context, client client, store *sqlite.Store, opts Options) 
 				return fmt.Errorf("upsert %s: %w", key, err)
 			}
 		}
-		slog.Info("upserted", "team", key, "count", len(issues))
+		logx.Infof("upserted: team=%s count=%d", key, len(issues))
 	}
 
 	return nil
