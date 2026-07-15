@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"forecasting/internal/aging"
+	"forecasting/internal/logx"
 	"forecasting/internal/sqlite"
 	"forecasting/internal/util"
 )
@@ -102,7 +103,7 @@ func cmdAging(args []string) error {
 	p85 := util.PercentileValue(cycleTimes, 85)
 
 	if len(cycleTimes) == 0 {
-		fmt.Fprintln(os.Stderr, "warning: no completed issues found in the sample window; percentiles will be 0")
+		logx.Warnf("no completed issues found in the sample window; percentiles will be 0")
 	}
 
 	switch *format {

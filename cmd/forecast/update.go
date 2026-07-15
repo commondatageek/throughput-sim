@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"forecasting/internal/logx"
 	"forecasting/internal/selfupdate"
 
 	"github.com/mattn/go-isatty"
@@ -37,7 +38,7 @@ func cmdUpdate(args []string) error {
 
 	current := version
 	if current == "" {
-		fmt.Fprintln(os.Stderr, "current build has no version info (a dev build); can't compare against the latest release")
+		logx.Warnf("current build has no version info (a dev build); can't compare against the latest release")
 		if !*force {
 			return fmt.Errorf("refusing to update a dev build without -force")
 		}

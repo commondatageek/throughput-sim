@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"forecasting/internal/linear"
+	"forecasting/internal/logx"
 	"forecasting/internal/simulate"
 	"forecasting/internal/sqlite"
 	"forecasting/internal/util"
@@ -76,7 +77,7 @@ func issuesToCompletions(issues []linear.Issue) []simulate.Completion {
 func warnUnmatchedTypicalEngineers(typicalEngineers []string, seen map[string]bool) {
 	for _, name := range typicalEngineers {
 		if !seen[name] {
-			fmt.Fprintf(os.Stderr, "WARNING: -typical-engineers engineer %q not found in data\n", name)
+			logx.Warnf("-typical-engineers engineer %q not found in data", name)
 		}
 	}
 }
@@ -107,7 +108,7 @@ func loadPool(dbPath, exclusionsFile string, typicalEngineers []string, startDat
 
 	records, skipped := simulate.FilterInvalid(issuesToCompletions(issues))
 	if skipped > 0 {
-		fmt.Fprintf(os.Stderr, "WARNING: skipped %d completed issue(s) with no assignee or completion date\n", skipped)
+		logx.Warnf("skipped %d completed issue(s) with no assignee or completion date", skipped)
 	}
 
 	return poolData{
@@ -210,7 +211,7 @@ func warnIfBlendingTeams(ctx context.Context, store *sqlite.Store, teams linear.
 		return err
 	}
 	if msg := blendingTeamsWarning(teams, keys); msg != "" {
-		fmt.Fprintln(os.Stderr, msg)
+		logx.Warnf("%s", msg)
 	}
 	return nil
 }
@@ -225,7 +226,7 @@ func blendingTeamsWarning(teams linear.TeamKeyList, allTeams []string) string {
 	if len(teams) > 0 || len(allTeams) <= 1 {
 		return ""
 	}
-	return fmt.Sprintf("warning: no -teams filter given; blending data across all %d teams (%s)",
+	return fmt.Sprintf("no -teams filter given; blending data across all %d teams (%s)",
 		len(allTeams), strings.Join(allTeams, ", "))
 }
 

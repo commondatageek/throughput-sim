@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"forecasting/internal/counts"
+	"forecasting/internal/logx"
 	"forecasting/internal/sqlite"
 	"forecasting/internal/util"
 )
@@ -70,7 +71,7 @@ func loadCountProjects(dbPath string, opts counts.Options) ([]counts.Project, in
 	multiTeam := len(allTeams) > 1
 
 	if msg := blendingTeamsWarning(opts.Teams, allTeams); msg != "" {
-		fmt.Fprintln(os.Stderr, msg)
+		logx.Warnf("%s", msg)
 	}
 
 	countRows, err := store.NotCompletedCounts(ctx, opts.Teams)
@@ -78,7 +79,7 @@ func loadCountProjects(dbPath string, opts counts.Options) ([]counts.Project, in
 		return nil, 0, false, err
 	}
 	if len(countRows) == 0 {
-		fmt.Fprintln(os.Stderr, "warning: no outstanding (non-terminal) issues found for the given filters")
+		logx.Warnf("no outstanding (non-terminal) issues found for the given filters")
 	}
 
 	activity, err := store.ProjectLastUpdated(ctx, opts.Teams)

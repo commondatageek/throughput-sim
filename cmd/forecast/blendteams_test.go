@@ -10,7 +10,7 @@ import (
 // count/aging/cfd: it must fire only when the user gave no -teams filter AND the
 // store holds more than one team, and the message must name the count and keys.
 func TestBlendingTeamsWarning(t *testing.T) {
-	want := "warning: no -teams filter given; blending data across all 2 teams (DATA, ENG)"
+	want := "no -teams filter given; blending data across all 2 teams (DATA, ENG)"
 
 	tests := []struct {
 		name     string
