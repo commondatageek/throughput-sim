@@ -263,3 +263,10 @@ excluded only for the named engineer.
   work counts.
 - `-random-seed`: time-based (non-deterministic) unless explicitly passed —
   either on the CLI or via `-config`.
+
+## License
+
+Copyright 2026 Aaron Johnson.
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the
+full text.
