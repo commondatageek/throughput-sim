@@ -20,7 +20,7 @@ Single Go module (`forecasting`, see `go.mod`) — no `go.work`. Tests exist in 
 
 ## Architecture
 
-This is a Linear-only throughput-forecasting toolkit: one model (`linear.Issue`) flows into a single SQLite store, which the simulation and reporting tools query.
+This is a Linear-only delivery-forecasting toolkit: one model (`linear.Issue`) flows into a single SQLite store, which the simulation and reporting tools query.
 
 ```
 linear.Client  --Fetch-->  linear.Issue  --Upsert-->  sqlite.Store (linear.db, "issues" table)

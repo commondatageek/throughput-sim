@@ -1,6 +1,6 @@
-# throughput-simulation
+# delivery-forecast
 
-A Linear-only throughput-forecasting toolkit. It syncs issues from
+A Linear-only delivery-forecasting toolkit. It syncs issues from
 [Linear](https://linear.app) into a local SQLite database, then runs
 Monte Carlo forecasts and cycle-time/flow reports against that data — all
 from a single `forecast` binary.
