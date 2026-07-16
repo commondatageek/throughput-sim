@@ -37,6 +37,23 @@ opted out.
 | `FORECAST_VERSION` | latest release | pin a specific release tag, e.g. `v1.2.3` |
 | `FORECAST_NO_MODIFY_PATH` | unset | set to skip editing your shell profile / User `PATH` |
 
+To pin a version (or set any other env var above) with the piped `install.sh`
+one-liner, put the assignment **after** the pipe, on the `sh` side — not
+before `curl`. `curl` and `sh` are separate processes joined by a pipe, so a
+prefix like `FORECAST_VERSION=v1.2.3 curl ... | sh` only sets the variable
+for `curl` and `sh` never sees it, silently installing latest instead:
+
+```bash
+# correct — the env var reaches sh, which is what reads it
+curl -fsSL https://raw.githubusercontent.com/commondatageek/delivery-forecast/main/install.sh | FORECAST_VERSION=v1.2.3 sh
+
+# also correct
+export FORECAST_VERSION=v1.2.3
+curl -fsSL https://raw.githubusercontent.com/commondatageek/delivery-forecast/main/install.sh | sh
+```
+
+(PowerShell's `irm | iex` doesn't have this issue — `$env:FORECAST_VERSION = "v1.2.3"` set beforehand works fine since both run in the same session.)
+
 Prefer to install manually? Grab the archive for your platform from the
 [releases page](https://github.com/commondatageek/delivery-forecast/releases)
 and extract the `forecast` binary onto your `PATH` yourself.
