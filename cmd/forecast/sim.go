@@ -37,11 +37,11 @@ func cmdSimItems(args []string) error {
 	}
 
 	now := time.Now()
-	startDate, err := util.ParseFlexibleDate(*sf.SampleStart, now)
+	startDate, err := util.ParseFlexibleStartDate(*sf.SampleStart, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start date: %w", err)
 	}
-	endDate, err := resolveEndDate(cmd, *sf.SampleEnd, now)
+	endDate, err := util.ParseFlexibleDate(*sf.SampleEnd, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}
@@ -176,11 +176,11 @@ func cmdSimDays(args []string) error {
 	}
 
 	now := time.Now()
-	startDate, err := util.ParseFlexibleDate(*sf.SampleStart, now)
+	startDate, err := util.ParseFlexibleStartDate(*sf.SampleStart, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start date: %w", err)
 	}
-	endDate, err := resolveEndDate(cmd, *sf.SampleEnd, now)
+	endDate, err := util.ParseFlexibleDate(*sf.SampleEnd, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}
@@ -204,7 +204,7 @@ func cmdSimDays(args []string) error {
 	}
 	seed := resolveSeed(cmd, *sf.RandomSeed, now)
 
-	targetStartDate, err := util.ParseFlexibleDate(*targetStartStr, now)
+	targetStartDate, err := util.ParseFlexibleStartDate(*targetStartStr, now)
 	if err != nil {
 		return fmt.Errorf("invalid -target-start-date: %w", err)
 	}
@@ -259,7 +259,7 @@ func cmdSimProbability(args []string) error {
 	sf := addSimFlags(cmd)
 	days := cmd.Int("days", 0, "number of days; mutually exclusive with -target-end-date, one must be given")
 	targetStartStr := cmd.String("target-start-date", "tomorrow", `start of the target window (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months"); default: tomorrow`)
-	targetEndStr := cmd.String("target-end-date", "", `end of the target window (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months"); mutually exclusive with -days, one must be given`)
+	targetEndStr := cmd.String("target-end-date", "", `end of the target window (YYYY-MM-DD; or: now, yesterday, today, tomorrow, "-3 months"); mutually exclusive with -days, one must be given`)
 	items := cmd.Int("items", -1, "number of items to complete (omit to show full distribution)")
 	manifestFile := cmd.String("manifest", "", `write a run-provenance JSON manifest to this path ("-" for stdout)`)
 	configFile := addConfigFlag(cmd)
@@ -288,11 +288,11 @@ func cmdSimProbability(args []string) error {
 	}
 
 	now := time.Now()
-	startDate, err := util.ParseFlexibleDate(*sf.SampleStart, now)
+	startDate, err := util.ParseFlexibleStartDate(*sf.SampleStart, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start date: %w", err)
 	}
-	endDate, err := resolveEndDate(cmd, *sf.SampleEnd, now)
+	endDate, err := util.ParseFlexibleDate(*sf.SampleEnd, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}
@@ -300,7 +300,7 @@ func cmdSimProbability(args []string) error {
 	effectiveDays := *days
 	var targetStart, targetEnd time.Time
 	if targetEndSet {
-		targetStart, err = util.ParseFlexibleDate(*targetStartStr, now)
+		targetStart, err = util.ParseFlexibleStartDate(*targetStartStr, now)
 		if err != nil {
 			return fmt.Errorf("invalid -target-start-date: %w", err)
 		}

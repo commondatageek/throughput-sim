@@ -17,8 +17,8 @@ import (
 func cmdAging(args []string) error {
 	cmd := flag.NewFlagSet("aging", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
-	sampleStartStr := cmd.String("sample-start", "", `start of completed-issue window (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months"; default: today minus 3 months)`)
-	sampleEndStr := cmd.String("sample-end", "", `end of completed-issue window (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months"; default: today)`)
+	sampleStartStr := cmd.String("sample-start", "-3 months", `start of completed-issue window (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months")`)
+	sampleEndStr := cmd.String("sample-end", "today", `end of completed-issue window (YYYY-MM-DD; or: now, yesterday, today, tomorrow, "-3 months")`)
 	format := cmd.String("format", "text", "output format: text, json, html")
 	minCycleTimeStr := cmd.String("min-cycle-time", "", "exclude completed issues with cycle time below this duration (e.g. 5m, 1h, 1d)")
 	showCompleted := cmd.Bool("show-completed", false, "text/html: also list the completed issues that make up the percentile distribution sample")
@@ -46,22 +46,14 @@ func cmdAging(args []string) error {
 	now := time.Now()
 	today := util.LocalDay(now)
 
-	sampleEnd := today
-	if *sampleEndStr != "" {
-		t, err := util.ParseFlexibleDate(*sampleEndStr, now)
-		if err != nil {
-			return fmt.Errorf("invalid -sample-end %q: %w", *sampleEndStr, err)
-		}
-		sampleEnd = t
+	sampleEnd, err := util.ParseFlexibleDate(*sampleEndStr, now)
+	if err != nil {
+		return fmt.Errorf("invalid -sample-end %q: %w", *sampleEndStr, err)
 	}
 
-	sampleStart := today.AddDate(0, -3, 0)
-	if *sampleStartStr != "" {
-		t, err := util.ParseFlexibleDate(*sampleStartStr, now)
-		if err != nil {
-			return fmt.Errorf("invalid -sample-start %q: %w", *sampleStartStr, err)
-		}
-		sampleStart = t
+	sampleStart, err := util.ParseFlexibleStartDate(*sampleStartStr, now)
+	if err != nil {
+		return fmt.Errorf("invalid -sample-start %q: %w", *sampleStartStr, err)
 	}
 
 	if !sampleStart.Before(sampleEnd) {

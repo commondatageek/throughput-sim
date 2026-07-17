@@ -39,7 +39,7 @@ func cmdSimBacktest(args []string) error {
 	project := cmd.String("project", "", "project name to backtest (required)")
 	milestone := cmd.String("milestone", "", "milestone name within the project (optional)")
 	replayStartStr := cmd.String("replay-start-date", "", `first day to replay from, inclusive (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months"); default: earliest started_at across the issue set`)
-	targetEndStr := cmd.String("target-end-date", "", `completion deadline to forecast against (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months"; required)`)
+	targetEndStr := cmd.String("target-end-date", "", `completion deadline to forecast against (YYYY-MM-DD; or: now, yesterday, today, tomorrow, "-3 months"; required)`)
 	format := cmd.String("format", "text", `output format: "text" or "csv"`)
 	configFile := addConfigFlag(cmd)
 	cmd.Parse(args)
@@ -67,11 +67,11 @@ func cmdSimBacktest(args []string) error {
 		return fmt.Errorf("invalid -target-end-date: %w", err)
 	}
 
-	sampleStartDate, err := util.ParseFlexibleDate(*sf.SampleStart, now)
+	sampleStartDate, err := util.ParseFlexibleStartDate(*sf.SampleStart, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start: %w", err)
 	}
-	sampleEndDate, err := resolveEndDate(cmd, *sf.SampleEnd, now)
+	sampleEndDate, err := util.ParseFlexibleDate(*sf.SampleEnd, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-end: %w", err)
 	}
@@ -115,7 +115,7 @@ func cmdSimBacktest(args []string) error {
 	// started_at across the issue set.
 	var startDate time.Time
 	if *replayStartStr != "" {
-		startDate, err = util.ParseFlexibleDate(*replayStartStr, now)
+		startDate, err = util.ParseFlexibleStartDate(*replayStartStr, now)
 		if err != nil {
 			return fmt.Errorf("invalid -replay-start-date: %w", err)
 		}

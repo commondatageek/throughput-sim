@@ -64,6 +64,11 @@ func TestParseFlexibleDate(t *testing.T) {
 		// "ago" means the past; singular units and no space accepted.
 		{"3 months ago", day(2026, 4, 16)},
 		{"1day ago", day(2026, 7, 15)},
+		// "now" is the one exception to the local-midnight snap: it's an
+		// instant, not a day, so it passes now through unmodified.
+		{"now", now},
+		{"Now", now},
+		{"  now  ", now},
 	}
 	for _, c := range cases {
 		got, err := ParseFlexibleDate(c.in, now)
@@ -91,6 +96,28 @@ func TestParseFlexibleDate_Errors(t *testing.T) {
 		if got, err := ParseFlexibleDate(in, now); err == nil {
 			t.Errorf("ParseFlexibleDate(%q) = %v, want error", in, got)
 		}
+	}
+}
+
+func TestParseFlexibleStartDate(t *testing.T) {
+	withLocal(t, "America/New_York")
+	now := time.Date(2026, 7, 16, 14, 30, 0, 0, time.Local)
+
+	// "now" is rejected, case-insensitively, whitespace-insensitively.
+	for _, in := range []string{"now", "Now", "NOW", "  now  "} {
+		if got, err := ParseFlexibleStartDate(in, now); err == nil {
+			t.Errorf("ParseFlexibleStartDate(%q) = %v, want error", in, got)
+		}
+	}
+
+	// Everything else behaves exactly like ParseFlexibleDate.
+	want := time.Date(2026, 7, 15, 0, 0, 0, 0, time.Local)
+	got, err := ParseFlexibleStartDate("yesterday", now)
+	if err != nil {
+		t.Fatalf("ParseFlexibleStartDate(yesterday) error: %v", err)
+	}
+	if !got.Equal(want) {
+		t.Errorf("ParseFlexibleStartDate(yesterday) = %v, want %v", got, want)
 	}
 }
 

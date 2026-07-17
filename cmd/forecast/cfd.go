@@ -16,8 +16,8 @@ import (
 func cmdCFD(args []string) error {
 	cmd := flag.NewFlagSet("cfd", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
-	startStr := cmd.String("start", "", `start date, inclusive (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months"; default: today minus 3 months)`)
-	endStr := cmd.String("end", "", `end date, inclusive (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months"; default: today)`)
+	startStr := cmd.String("start", "-3 months", `start date, inclusive (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months")`)
+	endStr := cmd.String("end", "today", `end date, inclusive (YYYY-MM-DD; or: now, yesterday, today, tomorrow, "-3 months")`)
 	format := cmd.String("format", "html", "output format: html, json")
 	outPath := cmd.String("out", "", "write output to this file instead of stdout")
 	teams := addTeamsFlag(cmd, "comma-separated team keys to filter by (e.g. ENG,DATA); default: all teams")
@@ -33,24 +33,15 @@ func cmdCFD(args []string) error {
 	}
 
 	now := time.Now()
-	today := util.LocalDay(now)
 
-	windowEnd := today
-	if *endStr != "" {
-		t, err := util.ParseFlexibleDate(*endStr, now)
-		if err != nil {
-			return fmt.Errorf("invalid -end %q: %w", *endStr, err)
-		}
-		windowEnd = t
+	windowEnd, err := util.ParseFlexibleDate(*endStr, now)
+	if err != nil {
+		return fmt.Errorf("invalid -end %q: %w", *endStr, err)
 	}
 
-	windowStart := today.AddDate(0, -3, 0)
-	if *startStr != "" {
-		t, err := util.ParseFlexibleDate(*startStr, now)
-		if err != nil {
-			return fmt.Errorf("invalid -start %q: %w", *startStr, err)
-		}
-		windowStart = t
+	windowStart, err := util.ParseFlexibleStartDate(*startStr, now)
+	if err != nil {
+		return fmt.Errorf("invalid -start %q: %w", *startStr, err)
 	}
 
 	if !windowStart.Before(windowEnd) {

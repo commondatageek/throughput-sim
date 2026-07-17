@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"forecasting/internal/simulate"
+	"forecasting/internal/util"
 )
 
 // day builds a local-midnight calendar date. Fixtures use time.Local (not UTC)
@@ -15,47 +16,42 @@ func day(y int, m time.Month, d int) time.Time {
 	return time.Date(y, m, d, 0, 0, 0, 0, time.Local)
 }
 
-// newSampleEndFlags returns a FlagSet defining the flags resolveEndDate and
-// resolveSeed inspect. The flags are only registered as "set" via fs.Set, which
-// is exactly what isFlagSet (backed by fs.Visit) keys off of.
-func newSampleEndFlags() *flag.FlagSet {
+// newRandomSeedFlags returns a FlagSet defining the flag resolveSeed inspects.
+// It's only registered as "set" via fs.Set, which is exactly what isFlagSet
+// (backed by fs.Visit) keys off of.
+func newRandomSeedFlags() *flag.FlagSet {
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
-	fs.String("sample-end", "", "")
 	fs.Int64("random-seed", 0, "")
 	return fs
 }
 
-func TestResolveEndDate(t *testing.T) {
+// TestSampleEndNow_DaysBetween pins the invariant -sample-end's "now" default
+// exists for: a mid-afternoon "now", parsed via util.ParseFlexibleDate (as
+// -sample-end's literal "now" default now is, in place of the old
+// isFlagSet-gated resolveEndDate), must come back as the exact instant so
+// simulate.DaysBetween counts today as a partial, inclusive slot. An explicit
+// calendar date, in contrast, snaps to midnight and excludes that whole day.
+func TestSampleEndNow_DaysBetween(t *testing.T) {
 	start := day(2025, 1, 1)
-	// Mid-afternoon "now": the unset branch must return this verbatim so that
-	// simulate.DaysBetween counts today as a partial, inclusive slot (the +1 branch).
 	now := time.Date(2025, 1, 5, 14, 30, 0, 0, time.Local)
 
-	// Unset -sample-end: defaults to now, today included as a partial slot.
-	fs := newSampleEndFlags()
-	end, err := resolveEndDate(fs, "", now)
+	end, err := util.ParseFlexibleDate("now", now)
 	if err != nil {
-		t.Fatalf("resolveEndDate (unset) error: %v", err)
+		t.Fatalf("ParseFlexibleDate(now) error: %v", err)
 	}
 	if !end.Equal(now) {
-		t.Errorf("resolveEndDate (unset) = %v, want now %v", end, now)
+		t.Errorf("ParseFlexibleDate(now) = %v, want now %v", end, now)
 	}
 	if got := simulate.DaysBetween(start, end); got != 5 {
-		t.Errorf("DaysBetween with default now: got %d, want 5 (today is a partial slot)", got)
+		t.Errorf("DaysBetween with now: got %d, want 5 (today is a partial slot)", got)
 	}
 
-	// Explicit -sample-end: parsed as a midnight calendar date, excluding that
-	// whole day and ignoring now.
-	fs = newSampleEndFlags()
-	if err := fs.Set("sample-end", "2025-01-05"); err != nil {
-		t.Fatal(err)
-	}
-	end, err = resolveEndDate(fs, "2025-01-05", now)
+	end, err = util.ParseFlexibleDate("2025-01-05", now)
 	if err != nil {
-		t.Fatalf("resolveEndDate (set) error: %v", err)
+		t.Fatalf("ParseFlexibleDate(2025-01-05) error: %v", err)
 	}
 	if !end.Equal(day(2025, 1, 5)) {
-		t.Errorf("resolveEndDate (set) = %v, want midnight 2025-01-05", end)
+		t.Errorf("ParseFlexibleDate(2025-01-05) = %v, want midnight 2025-01-05", end)
 	}
 	if got := simulate.DaysBetween(start, end); got != 4 {
 		t.Errorf("DaysBetween with explicit midnight end: got %d, want 4", got)
@@ -66,13 +62,13 @@ func TestResolveSeed(t *testing.T) {
 	now := time.Date(2025, 1, 5, 14, 30, 0, 0, time.Local)
 
 	// Unset -random-seed: time-based seed derived from now.
-	fs := newSampleEndFlags()
+	fs := newRandomSeedFlags()
 	if got := resolveSeed(fs, 99, now); got != now.UnixNano() {
 		t.Errorf("resolveSeed (unset) = %d, want %d", got, now.UnixNano())
 	}
 
 	// Explicit -random-seed: returned verbatim, now ignored.
-	fs = newSampleEndFlags()
+	fs = newRandomSeedFlags()
 	if err := fs.Set("random-seed", "99"); err != nil {
 		t.Fatal(err)
 	}
