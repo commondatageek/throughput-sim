@@ -1,14 +1,13 @@
 // Package logx is a tiny leveled logger for the forecast CLI: plain,
-// human-readable lines ("<HH:MM:SS> <LEVEL> <message>") instead of
-// structured key=value output, with the level color-coded when stderr is a
-// terminal and NO_COLOR is unset.
+// human-readable lines ("<LEVEL> <message>") instead of structured
+// key=value output, with the level color-coded when stderr is a terminal
+// and NO_COLOR is unset.
 package logx
 
 import (
 	"fmt"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/mattn/go-isatty"
 )
@@ -37,10 +36,7 @@ var levelColors = map[Level]string{
 	Error: "\033[31m", // red
 }
 
-const (
-	colorReset = "\033[0m"
-	colorDim   = "\033[90m"
-)
+const colorReset = "\033[0m"
 
 var (
 	mu        sync.Mutex
@@ -61,12 +57,11 @@ func logf(l Level, format string, args ...any) {
 	if l < threshold {
 		return
 	}
-	ts := time.Now().Format("15:04:05")
 	msg := fmt.Sprintf(format, args...)
 	if colorOn {
-		fmt.Fprintf(os.Stderr, "%s%s%s %s%s%s %s\n", colorDim, ts, colorReset, levelColors[l], levelLabels[l], colorReset, msg)
+		fmt.Fprintf(os.Stderr, "%s%s%s %s\n", levelColors[l], levelLabels[l], colorReset, msg)
 	} else {
-		fmt.Fprintf(os.Stderr, "%s %s %s\n", ts, levelLabels[l], msg)
+		fmt.Fprintf(os.Stderr, "%s %s\n", levelLabels[l], msg)
 	}
 }
 
