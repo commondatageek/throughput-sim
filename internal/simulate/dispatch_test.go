@@ -5,11 +5,11 @@ import "testing"
 // constantPool builds a pool where every engineer's samples are the single
 // constant value v, so every simulation trial is fully determined.
 func constantPool(v int, engineers ...string) *SamplePool {
-	pool := &SamplePool{PerEngineer: make(map[string][]int)}
+	perEngineer := make(map[string][]int)
 	for _, eng := range engineers {
-		pool.PerEngineer[eng] = []int{v}
+		perEngineer[eng] = []int{v}
 	}
-	return pool
+	return NewSamplePool(perEngineer)
 }
 
 func TestItemsInDays_Dispatch(t *testing.T) {

@@ -59,10 +59,10 @@ func TestNewManifest_Assembly(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pool := &simulate.SamplePool{PerEngineer: map[string][]int{
+	pool := simulate.NewSamplePool(map[string][]int{
 		"alice": {1, 0, 2},
 		"bob":   {0, 0},
-	}}
+	})
 	issues := []linear.Issue{
 		{Identifier: "ENG-1", Assignee: "alice", CompletedAt: day(2025, 1, 5)},
 		{Identifier: "ENG-2", Assignee: "bob", CompletedAt: day(2025, 1, 6)},

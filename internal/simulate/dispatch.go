@@ -40,7 +40,7 @@ func ItemsInDays(pool *SamplePool, p Params) []int {
 	case ModeFullTeam:
 		return SimulateItemsInDays(pool.PerEngineer[WholeTeamKey], 1, p.Days, p.Simulations, p.Workers, p.Seed, p.Progress)
 	default: // ModeAnonymous
-		return SimulateItemsInDays(pool.GetCombinedSamples(), p.Engineers, p.Days, p.Simulations, p.Workers, p.Seed, p.Progress)
+		return SimulateItemsInDays(pool.Combined, p.Engineers, p.Days, p.Simulations, p.Workers, p.Seed, p.Progress)
 	}
 }
 
@@ -56,6 +56,6 @@ func DaysToComplete(pool *SamplePool, p Params) []int {
 	case ModeFullTeam:
 		return SimulateDaysToComplete(pool.PerEngineer[WholeTeamKey], 1, p.Items, p.Simulations, p.Workers, p.Seed, p.Progress)
 	default: // ModeAnonymous
-		return SimulateDaysToComplete(pool.GetCombinedSamples(), p.Engineers, p.Items, p.Simulations, p.Workers, p.Seed, p.Progress)
+		return SimulateDaysToComplete(pool.Combined, p.Engineers, p.Items, p.Simulations, p.Workers, p.Seed, p.Progress)
 	}
 }

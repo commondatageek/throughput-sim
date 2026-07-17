@@ -293,7 +293,7 @@ func newManifest(in manifestInputs) *Manifest {
 			PerEngineerSampleDays:  perDays,
 			TotalSampleDays:        totalDays,
 			TotalCompletions:       totalComp,
-			CombinedSampleCount:    len(in.Pool.GetCombinedSamples()),
+			CombinedSampleCount:    len(in.Pool.Combined),
 		},
 		Issues: IssuesSection{
 			QueriedCount: len(in.Issues),

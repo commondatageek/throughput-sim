@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -82,6 +83,19 @@ func warnUnmatchedTypicalEngineers(typicalEngineers []string, seen map[string]bo
 	}
 }
 
+// loadExclusions reads and parses an exclusions JSON file. If the file does
+// not exist, an empty Exclusions is returned without error.
+func loadExclusions(path string) (simulate.Exclusions, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return simulate.Exclusions{}, nil
+		}
+		return simulate.Exclusions{}, fmt.Errorf("reading exclusions file: %w", err)
+	}
+	return simulate.ParseExclusions(data)
+}
+
 // loadPool builds a SamplePool by querying the SQLite store.
 func loadPool(dbPath, exclusionsFile string, typicalEngineers []string, startDate, endDate time.Time, wholeTeam bool) (poolData, error) {
 	store, err := sqlite.OpenExisting(dbPath)
@@ -101,7 +115,7 @@ func loadPool(dbPath, exclusionsFile string, typicalEngineers []string, startDat
 	}
 	warnUnmatchedTypicalEngineers(typicalEngineers, engineerSeen)
 
-	exc, err := simulate.LoadExclusions(exclusionsFile)
+	exc, err := loadExclusions(exclusionsFile)
 	if err != nil {
 		return poolData{}, err
 	}

@@ -58,17 +58,17 @@ func TestModeLabel(t *testing.T) {
 }
 
 func TestValidatePool(t *testing.T) {
-	named := &SamplePool{PerEngineer: map[string][]int{
+	named := NewSamplePool(map[string][]int{
 		"alice": {1, 0, 2},
 		"bob":   {3},
 		"empty": {},        // present but every day excluded -> no samples
 		"zero":  {0, 0, 0}, // present, has slots, but never completed anything
-	}}
-	full := &SamplePool{PerEngineer: map[string][]int{WholeTeamKey: {0, 1, 0}}}
-	zeroFull := &SamplePool{PerEngineer: map[string][]int{WholeTeamKey: {0, 0, 0}}}
-	emptyFull := &SamplePool{PerEngineer: map[string][]int{WholeTeamKey: {}}}
-	emptyAnon := &SamplePool{PerEngineer: map[string][]int{}}
-	zeroAnon := &SamplePool{PerEngineer: map[string][]int{"alice": {0, 0}, "bob": {0}}}
+	})
+	full := NewSamplePool(map[string][]int{WholeTeamKey: {0, 1, 0}})
+	zeroFull := NewSamplePool(map[string][]int{WholeTeamKey: {0, 0, 0}})
+	emptyFull := NewSamplePool(map[string][]int{WholeTeamKey: {}})
+	emptyAnon := NewSamplePool(map[string][]int{})
+	zeroAnon := NewSamplePool(map[string][]int{"alice": {0, 0}, "bob": {0}})
 
 	cases := []struct {
 		name            string

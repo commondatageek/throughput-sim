@@ -93,7 +93,7 @@ func ValidatePool(pool *SamplePool, mode Mode, team []string, requireProgress bo
 			return fmt.Errorf("whole-team throughput was 0 in the selected window; days-to-complete is undefined (it would never finish)")
 		}
 	default: // ModeAnonymous
-		samples := pool.GetCombinedSamples()
+		samples := pool.Combined
 		if len(samples) == 0 {
 			return fmt.Errorf("no completed items in the selected window (try a different -sample-start/-sample-end)")
 		}

@@ -2,10 +2,8 @@ package simulate
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/rand"
-	"os"
 	"sort"
 	"time"
 
@@ -47,16 +45,9 @@ type Exclusions struct {
 	Engineers map[string][]string `json:"engineers"`
 }
 
-// LoadExclusions reads an exclusions JSON file. If the file does not exist,
-// an empty Exclusions is returned without error.
-func LoadExclusions(path string) (Exclusions, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return Exclusions{}, nil
-		}
-		return Exclusions{}, fmt.Errorf("reading exclusions file: %w", err)
-	}
+// ParseExclusions parses exclusions JSON data, as read from an exclusions
+// file by the caller.
+func ParseExclusions(data []byte) (Exclusions, error) {
 	var exc Exclusions
 	if err := json.Unmarshal(data, &exc); err != nil {
 		return Exclusions{}, fmt.Errorf("parsing exclusions file: %w", err)
@@ -64,9 +55,22 @@ func LoadExclusions(path string) (Exclusions, error) {
 	return exc, nil
 }
 
-// SamplePool holds per-engineer slices of daily completion counts.
+// SamplePool holds per-engineer slices of daily completion counts, plus the
+// precomputed flattened view (Combined) that anonymous-mode simulations draw
+// from. Construct via NewSamplePool (or BuildPool) so Combined is always
+// populated; a zero-value SamplePool leaves it nil.
 type SamplePool struct {
 	PerEngineer map[string][]int
+	Combined    []int
+}
+
+// NewSamplePool builds a SamplePool from per-engineer sample slices,
+// precomputing Combined so simulation code never has to derive it.
+func NewSamplePool(perEngineer map[string][]int) *SamplePool {
+	return &SamplePool{
+		PerEngineer: perEngineer,
+		Combined:    combineSamples(perEngineer),
+	}
 }
 
 // DrawFromEngineer randomly samples one daily completion count for engineer.
@@ -75,19 +79,19 @@ func (p *SamplePool) DrawFromEngineer(engineer string, rng *rand.Rand) int {
 	return samples[rng.Intn(len(samples))]
 }
 
-// GetCombinedSamples returns all engineers' samples concatenated into a flat
-// slice, ordered by engineer name so the result (and thus anything sampled
-// from it under a pinned seed) is deterministic across runs.
-func (p *SamplePool) GetCombinedSamples() []int {
-	names := make([]string, 0, len(p.PerEngineer))
-	for name := range p.PerEngineer {
+// combineSamples concatenates all engineers' samples into a flat slice,
+// ordered by engineer name so the result (and thus anything sampled from it
+// under a pinned seed) is deterministic across runs.
+func combineSamples(perEngineer map[string][]int) []int {
+	names := make([]string, 0, len(perEngineer))
+	for name := range perEngineer {
 		names = append(names, name)
 	}
 	sort.Strings(names)
 
 	var combined []int
 	for _, name := range names {
-		combined = append(combined, p.PerEngineer[name]...)
+		combined = append(combined, perEngineer[name]...)
 	}
 	return combined
 }
@@ -150,7 +154,7 @@ func BuildPool(records []Completion, exc Exclusions, startDate, endDate time.Tim
 		eng.counts[idx]++
 	}
 
-	pool := &SamplePool{PerEngineer: make(map[string][]int)}
+	perEngineer := make(map[string][]int)
 
 	if wholeTeam {
 		teamCounts := make([]int, totalDays)
@@ -165,7 +169,7 @@ func BuildPool(records []Completion, exc Exclusions, startDate, endDate time.Tim
 				teamSamples = append(teamSamples, count)
 			}
 		}
-		pool.PerEngineer[WholeTeamKey] = teamSamples
+		perEngineer[WholeTeamKey] = teamSamples
 	} else {
 		for name, eng := range engineers {
 			excluded := make(map[int]bool, len(globalExcluded))
@@ -186,9 +190,9 @@ func BuildPool(records []Completion, exc Exclusions, startDate, endDate time.Tim
 					engineerSamples = append(engineerSamples, count)
 				}
 			}
-			pool.PerEngineer[name] = engineerSamples
+			perEngineer[name] = engineerSamples
 		}
 	}
 
-	return pool
+	return NewSamplePool(perEngineer)
 }
