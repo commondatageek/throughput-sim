@@ -34,6 +34,66 @@ func TestParseDate_Local(t *testing.T) {
 	}
 }
 
+func TestParseFlexibleDate(t *testing.T) {
+	withLocal(t, "America/New_York")
+
+	// A mid-afternoon "now" so we can prove results snap to local midnight.
+	now := time.Date(2026, 7, 16, 14, 30, 0, 0, time.Local)
+	day := func(y int, m time.Month, d int) time.Time {
+		return time.Date(y, m, d, 0, 0, 0, 0, time.Local)
+	}
+
+	cases := []struct {
+		in   string
+		want time.Time
+	}{
+		// Explicit calendar date still works, snapped to local midnight.
+		{"2026-01-05", day(2026, 1, 5)},
+		// Keywords.
+		{"today", day(2026, 7, 16)},
+		{"Today", day(2026, 7, 16)},
+		{"  tomorrow ", day(2026, 7, 17)},
+		{"yesterday", day(2026, 7, 15)},
+		// Signed relative offsets.
+		{"-90 days", day(2026, 4, 17)},
+		{"+2 weeks", day(2026, 7, 30)},
+		{"-3 months", day(2026, 4, 16)}, // calendar months, not 90 days
+		{"+1 year", day(2027, 7, 16)},
+		// Bare (no sign) means the past.
+		{"90 days", day(2026, 4, 17)},
+		// "ago" means the past; singular units and no space accepted.
+		{"3 months ago", day(2026, 4, 16)},
+		{"1day ago", day(2026, 7, 15)},
+	}
+	for _, c := range cases {
+		got, err := ParseFlexibleDate(c.in, now)
+		if err != nil {
+			t.Errorf("ParseFlexibleDate(%q) error: %v", c.in, err)
+			continue
+		}
+		if !got.Equal(c.want) {
+			t.Errorf("ParseFlexibleDate(%q) = %v, want %v", c.in, got, c.want)
+		}
+	}
+}
+
+func TestParseFlexibleDate_Errors(t *testing.T) {
+	withLocal(t, "America/New_York")
+	now := time.Date(2026, 7, 16, 14, 30, 0, 0, time.Local)
+
+	for _, in := range []string{
+		"+3 months ago", // sign and "ago" contradict
+		"3 fortnights",   // unknown unit
+		"next week",      // unsupported keyword
+		"not-a-date",
+		"",
+	} {
+		if got, err := ParseFlexibleDate(in, now); err == nil {
+			t.Errorf("ParseFlexibleDate(%q) = %v, want error", in, got)
+		}
+	}
+}
+
 func TestLocalDay_BucketsByLocalCalendarDay(t *testing.T) {
 	withLocal(t, "America/New_York")
 
