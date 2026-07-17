@@ -104,7 +104,7 @@ func TestApplyConfig(t *testing.T) {
 	t.Run("populates_unset_flags", func(t *testing.T) {
 		fs := newTestFlagSet()
 		fs.Parse([]string{})
-		if err := applyConfig(fs, map[string]any{"engineers": 7, "whole-team": false}); err != nil {
+		if _, err := applyConfig(fs, map[string]any{"engineers": 7, "whole-team": false}, map[string]bool{}); err != nil {
 			t.Fatal(err)
 		}
 		got := fs.Lookup("engineers").Value.String()
@@ -116,7 +116,8 @@ func TestApplyConfig(t *testing.T) {
 	t.Run("cli_flag_not_overridden_by_config", func(t *testing.T) {
 		fs := newTestFlagSet()
 		fs.Parse([]string{"-engineers", "2"})
-		if err := applyConfig(fs, map[string]any{"engineers": 9}); err != nil {
+		cliSet := snapshotSetFlags(fs)
+		if _, err := applyConfig(fs, map[string]any{"engineers": 9}, cliSet); err != nil {
 			t.Fatal(err)
 		}
 		got := fs.Lookup("engineers").Value.String()
@@ -128,7 +129,7 @@ func TestApplyConfig(t *testing.T) {
 	t.Run("config_set_flag_reports_as_set", func(t *testing.T) {
 		fs := newTestFlagSet()
 		fs.Parse([]string{})
-		if err := applyConfig(fs, map[string]any{"engineers": 5}); err != nil {
+		if _, err := applyConfig(fs, map[string]any{"engineers": 5}, map[string]bool{}); err != nil {
 			t.Fatal(err)
 		}
 		if !isFlagSet(fs, "engineers") {
@@ -139,7 +140,7 @@ func TestApplyConfig(t *testing.T) {
 	t.Run("unknown_key_errors", func(t *testing.T) {
 		fs := newTestFlagSet()
 		fs.Parse([]string{})
-		if err := applyConfig(fs, map[string]any{"enginers": 4}); err == nil {
+		if _, err := applyConfig(fs, map[string]any{"enginers": 4}, map[string]bool{}); err == nil {
 			t.Error("expected error for unknown key, got nil")
 		}
 	})
@@ -147,7 +148,7 @@ func TestApplyConfig(t *testing.T) {
 	t.Run("joins_multiple_key_errors", func(t *testing.T) {
 		fs := newTestFlagSet()
 		fs.Parse([]string{})
-		err := applyConfig(fs, map[string]any{"enginers": 4, "wole-team": true})
+		_, err := applyConfig(fs, map[string]any{"enginers": 4, "wole-team": true}, map[string]bool{})
 		if err == nil {
 			t.Fatal("expected error for unknown keys, got nil")
 		}
@@ -163,7 +164,7 @@ func TestApplyConfig(t *testing.T) {
 	t.Run("yaml_list_parses_into_commaList", func(t *testing.T) {
 		fs := newTestFlagSet()
 		fs.Parse([]string{})
-		if err := applyConfig(fs, map[string]any{"percentile": []any{5, 25, 50}}); err != nil {
+		if _, err := applyConfig(fs, map[string]any{"percentile": []any{5, 25, 50}}, map[string]bool{}); err != nil {
 			t.Fatal(err)
 		}
 		got := fs.Lookup("percentile").Value.String()
@@ -176,7 +177,7 @@ func TestApplyConfig(t *testing.T) {
 		fs := newTestFlagSet()
 		fs.String("config", "", "")
 		fs.Parse([]string{})
-		if err := applyConfig(fs, map[string]any{"config": "some-other.yaml", "engineers": 6}); err != nil {
+		if _, err := applyConfig(fs, map[string]any{"config": "some-other.yaml", "engineers": 6}, map[string]bool{}); err != nil {
 			t.Fatal(err)
 		}
 		got := fs.Lookup("engineers").Value.String()
@@ -188,8 +189,13 @@ func TestApplyConfig(t *testing.T) {
 	t.Run("missing_file_errors", func(t *testing.T) {
 		fs := newTestFlagSet()
 		fs.Parse([]string{})
-		if err := ApplyConfig(fs, "/no/such/file.yaml"); err == nil {
-			t.Error("expected error for missing file, got nil")
+		out := captureStderr(t, func() {
+			if err := ApplyConfig(fs, "/no/such/file.yaml"); err == nil {
+				t.Error("expected error for missing file, got nil")
+			}
+		})
+		if !strings.Contains(out, "engineers = 3 (default)") {
+			t.Errorf("expected effective-flags report even on config load error, got %q", out)
 		}
 	})
 
@@ -201,19 +207,84 @@ func TestApplyConfig(t *testing.T) {
 		}
 	})
 
-	t.Run("logs_applied_keys_at_info", func(t *testing.T) {
+	t.Run("reports_default_source", func(t *testing.T) {
 		fs := newTestFlagSet()
-		fs.Parse([]string{"-engineers", "2"})
+		fs.Parse([]string{})
 		out := captureStderr(t, func() {
-			if err := applyConfig(fs, map[string]any{"engineers": 9, "whole-team": true}); err != nil {
+			if err := ApplyConfig(fs, ""); err != nil {
 				t.Fatal(err)
 			}
 		})
-		if !strings.Contains(out, "whole-team = true") {
-			t.Errorf("expected log of applied config key, got %q", out)
+		if !strings.Contains(out, "engineers = 3 (default)") {
+			t.Errorf("expected default-source log for untouched flag, got %q", out)
 		}
-		if strings.Contains(out, "engineers") {
-			t.Errorf("expected no log for CLI-overridden key, got %q", out)
+	})
+
+	t.Run("reports_config_file_source", func(t *testing.T) {
+		fs := newTestFlagSet()
+		fs.Parse([]string{})
+		path := writeYAML(t, "engineers: 9\n")
+		out := captureStderr(t, func() {
+			if err := ApplyConfig(fs, path); err != nil {
+				t.Fatal(err)
+			}
+		})
+		if !strings.Contains(out, "engineers = 9 (config file)") {
+			t.Errorf("expected config-file-source log, got %q", out)
+		}
+	})
+
+	t.Run("reports_cli_flag_source", func(t *testing.T) {
+		fs := newTestFlagSet()
+		fs.Parse([]string{"-engineers", "2"})
+		out := captureStderr(t, func() {
+			if err := ApplyConfig(fs, ""); err != nil {
+				t.Fatal(err)
+			}
+		})
+		if !strings.Contains(out, "engineers = 2 (CLI flag)") {
+			t.Errorf("expected CLI-flag-source log, got %q", out)
+		}
+	})
+
+	t.Run("logs_even_with_no_config_path", func(t *testing.T) {
+		fs := newTestFlagSet()
+		fs.Parse([]string{})
+		out := captureStderr(t, func() {
+			if err := ApplyConfig(fs, ""); err != nil {
+				t.Fatal(err)
+			}
+		})
+		if !strings.Contains(out, "db =  (default)") {
+			t.Errorf("expected effective-flags report even with path==\"\", got %q", out)
+		}
+	})
+
+	t.Run("cli_wins_reports_cli_flag_not_config_file", func(t *testing.T) {
+		fs := newTestFlagSet()
+		fs.Parse([]string{"-engineers", "2"})
+		path := writeYAML(t, "engineers: 9\n")
+		out := captureStderr(t, func() {
+			if err := ApplyConfig(fs, path); err != nil {
+				t.Fatal(err)
+			}
+		})
+		if !strings.Contains(out, "engineers = 2 (CLI flag)") {
+			t.Errorf("expected CLI value+source to win, got %q", out)
+		}
+	})
+
+	t.Run("logs_partial_failure_attributes_succeeded_keys", func(t *testing.T) {
+		fs := newTestFlagSet()
+		fs.Parse([]string{})
+		path := writeYAML(t, "engineers: 5\nenginers: 4\n")
+		out := captureStderr(t, func() {
+			if err := ApplyConfig(fs, path); err == nil {
+				t.Fatal("expected error for unknown key, got nil")
+			}
+		})
+		if !strings.Contains(out, "engineers = 5 (config file)") {
+			t.Errorf("expected succeeded key to still be attributed to config, got %q", out)
 		}
 	})
 
