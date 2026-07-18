@@ -8,8 +8,8 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/commondatageek/delivery-forecast/internal/simulate"
 	"github.com/commondatageek/delivery-forecast/internal/util"
+	"github.com/commondatageek/delivery-forecast/simulate"
 )
 
 func cmdSimItems(args []string) error {

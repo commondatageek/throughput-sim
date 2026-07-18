@@ -13,8 +13,8 @@ import (
 
 	"github.com/commondatageek/delivery-forecast/internal/linear"
 	"github.com/commondatageek/delivery-forecast/internal/logx"
-	"github.com/commondatageek/delivery-forecast/internal/simulate"
 	"github.com/commondatageek/delivery-forecast/internal/sqlite"
+	"github.com/commondatageek/delivery-forecast/simulate"
 
 	"github.com/mattn/go-isatty"
 )

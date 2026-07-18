@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/commondatageek/delivery-forecast/internal/linear"
-	"github.com/commondatageek/delivery-forecast/internal/simulate"
+	"github.com/commondatageek/delivery-forecast/simulate"
 )
 
 func TestBuildInfo_Degrades(t *testing.T) {

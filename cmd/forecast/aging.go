@@ -8,7 +8,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/commondatageek/delivery-forecast/internal/aging"
+	"github.com/commondatageek/delivery-forecast/aging"
 	"github.com/commondatageek/delivery-forecast/internal/linear"
 	"github.com/commondatageek/delivery-forecast/internal/logx"
 	"github.com/commondatageek/delivery-forecast/internal/sqlite"

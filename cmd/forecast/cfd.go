@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/commondatageek/delivery-forecast/internal/cfd"
+	"github.com/commondatageek/delivery-forecast/cfd"
 	"github.com/commondatageek/delivery-forecast/internal/logx"
 	"github.com/commondatageek/delivery-forecast/internal/sqlite"
 	"github.com/commondatageek/delivery-forecast/internal/util"

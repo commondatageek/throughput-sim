@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/commondatageek/delivery-forecast/internal/linear"
-	"github.com/commondatageek/delivery-forecast/internal/simulate"
 	"github.com/commondatageek/delivery-forecast/internal/sqlite"
 	"github.com/commondatageek/delivery-forecast/internal/util"
+	"github.com/commondatageek/delivery-forecast/simulate"
 )
 
 // issuesToBacktestItems converts linear.Issue records to simulate.BacktestItem.

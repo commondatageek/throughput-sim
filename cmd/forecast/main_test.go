@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/commondatageek/delivery-forecast/internal/simulate"
 	"github.com/commondatageek/delivery-forecast/internal/util"
+	"github.com/commondatageek/delivery-forecast/simulate"
 )
 
 // day builds a local-midnight calendar date. Fixtures use time.Local (not UTC)

@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/commondatageek/delivery-forecast/internal/linear"
-	"github.com/commondatageek/delivery-forecast/internal/simulate"
+	"github.com/commondatageek/delivery-forecast/simulate"
 )
 
 // Manifest is a single JSON document recording everything that fed a
