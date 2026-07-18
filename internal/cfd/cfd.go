@@ -9,9 +9,9 @@ import (
 	"math"
 	"time"
 
-	"forecasting/internal/linear"
-	"forecasting/internal/sqlite"
-	"forecasting/internal/util"
+	"github.com/commondatageek/delivery-forecast/internal/linear"
+	"github.com/commondatageek/delivery-forecast/internal/sqlite"
+	"github.com/commondatageek/delivery-forecast/internal/util"
 )
 
 //go:embed template.html

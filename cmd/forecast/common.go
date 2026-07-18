@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"forecasting/internal/linear"
-	"forecasting/internal/logx"
-	"forecasting/internal/simulate"
-	"forecasting/internal/sqlite"
+	"github.com/commondatageek/delivery-forecast/internal/linear"
+	"github.com/commondatageek/delivery-forecast/internal/logx"
+	"github.com/commondatageek/delivery-forecast/internal/simulate"
+	"github.com/commondatageek/delivery-forecast/internal/sqlite"
 
 	"github.com/mattn/go-isatty"
 )

@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"os"
 
-	"forecasting/internal/linear"
-	"forecasting/internal/sqlite"
-	"forecasting/internal/syncer"
-	"forecasting/internal/util"
+	"github.com/commondatageek/delivery-forecast/internal/linear"
+	"github.com/commondatageek/delivery-forecast/internal/sqlite"
+	"github.com/commondatageek/delivery-forecast/internal/syncer"
+	"github.com/commondatageek/delivery-forecast/internal/util"
 )
 
 func cmdLinearSync(args []string) error {

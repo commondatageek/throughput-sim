@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"forecasting/internal/logx"
-	"forecasting/internal/selfupdate"
+	"github.com/commondatageek/delivery-forecast/internal/logx"
+	"github.com/commondatageek/delivery-forecast/internal/selfupdate"
 
 	"github.com/mattn/go-isatty"
 )

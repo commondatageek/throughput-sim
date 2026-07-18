@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"forecasting/internal/linear"
+	"github.com/commondatageek/delivery-forecast/internal/linear"
 )
 
 // TestBlendingTeamsWarning guards the multi-team blend warning shared by

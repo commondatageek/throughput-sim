@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"forecasting/internal/logx"
+	"github.com/commondatageek/delivery-forecast/internal/logx"
 )
 
 type command struct {

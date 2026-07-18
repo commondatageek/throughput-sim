@@ -3,7 +3,7 @@ package simulate
 import (
 	"time"
 
-	"forecasting/internal/util"
+	"github.com/commondatageek/delivery-forecast/internal/util"
 )
 
 // BacktestItem is the neutral per-issue record the backtest needs: just the

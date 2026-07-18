@@ -8,10 +8,10 @@ import (
 	"sort"
 	"time"
 
-	"forecasting/internal/aging"
-	"forecasting/internal/logx"
-	"forecasting/internal/sqlite"
-	"forecasting/internal/util"
+	"github.com/commondatageek/delivery-forecast/internal/aging"
+	"github.com/commondatageek/delivery-forecast/internal/logx"
+	"github.com/commondatageek/delivery-forecast/internal/sqlite"
+	"github.com/commondatageek/delivery-forecast/internal/util"
 )
 
 func cmdAging(args []string) error {

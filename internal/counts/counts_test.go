@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"forecasting/internal/sqlite"
+	"github.com/commondatageek/delivery-forecast/internal/sqlite"
 )
 
 func mustTime(s string) time.Time {

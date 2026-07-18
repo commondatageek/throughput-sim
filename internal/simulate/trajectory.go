@@ -1,6 +1,6 @@
 package simulate
 
-import "forecasting/internal/util"
+import "github.com/commondatageek/delivery-forecast/internal/util"
 
 // TrajectoryCell is one (group, percentile) entry in the grouped trajectory
 // report: the marginal days to finish that group and the cumulative days from

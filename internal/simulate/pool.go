@@ -7,7 +7,7 @@ import (
 	"sort"
 	"time"
 
-	"forecasting/internal/util"
+	"github.com/commondatageek/delivery-forecast/internal/util"
 )
 
 // WholeTeamKey is the SamplePool.PerEngineer key used in whole-team mode,

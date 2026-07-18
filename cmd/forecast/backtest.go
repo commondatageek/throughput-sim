@@ -12,10 +12,10 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"forecasting/internal/linear"
-	"forecasting/internal/simulate"
-	"forecasting/internal/sqlite"
-	"forecasting/internal/util"
+	"github.com/commondatageek/delivery-forecast/internal/linear"
+	"github.com/commondatageek/delivery-forecast/internal/simulate"
+	"github.com/commondatageek/delivery-forecast/internal/sqlite"
+	"github.com/commondatageek/delivery-forecast/internal/util"
 )
 
 // issuesToBacktestItems converts linear.Issue records to simulate.BacktestItem.

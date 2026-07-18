@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"time"
 
-	"forecasting/internal/linear"
-	"forecasting/internal/logx"
-	"forecasting/internal/sqlite"
+	"github.com/commondatageek/delivery-forecast/internal/linear"
+	"github.com/commondatageek/delivery-forecast/internal/logx"
+	"github.com/commondatageek/delivery-forecast/internal/sqlite"
 )
 
 // Options controls which teams are synced and how. Every field mirrors a

@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"forecasting/internal/linear"
+	"github.com/commondatageek/delivery-forecast/internal/linear"
 
 	_ "modernc.org/sqlite"
 )

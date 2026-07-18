@@ -10,7 +10,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"forecasting/internal/logx"
+	"github.com/commondatageek/delivery-forecast/internal/logx"
 
 	"gopkg.in/yaml.v3"
 )

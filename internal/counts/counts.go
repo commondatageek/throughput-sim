@@ -7,8 +7,8 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"forecasting/internal/linear"
-	"forecasting/internal/sqlite"
+	"github.com/commondatageek/delivery-forecast/internal/linear"
+	"github.com/commondatageek/delivery-forecast/internal/sqlite"
 )
 
 const (

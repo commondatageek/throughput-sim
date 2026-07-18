@@ -1,4 +1,4 @@
-module forecasting
+module github.com/commondatageek/delivery-forecast
 
 go 1.26
 

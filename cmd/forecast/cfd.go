@@ -7,10 +7,10 @@ import (
 	"os"
 	"time"
 
-	"forecasting/internal/cfd"
-	"forecasting/internal/logx"
-	"forecasting/internal/sqlite"
-	"forecasting/internal/util"
+	"github.com/commondatageek/delivery-forecast/internal/cfd"
+	"github.com/commondatageek/delivery-forecast/internal/logx"
+	"github.com/commondatageek/delivery-forecast/internal/sqlite"
+	"github.com/commondatageek/delivery-forecast/internal/util"
 )
 
 func cmdCFD(args []string) error {

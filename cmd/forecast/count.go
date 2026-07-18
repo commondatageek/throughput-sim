@@ -7,10 +7,10 @@ import (
 	"os"
 	"time"
 
-	"forecasting/internal/counts"
-	"forecasting/internal/logx"
-	"forecasting/internal/sqlite"
-	"forecasting/internal/util"
+	"github.com/commondatageek/delivery-forecast/internal/counts"
+	"github.com/commondatageek/delivery-forecast/internal/logx"
+	"github.com/commondatageek/delivery-forecast/internal/sqlite"
+	"github.com/commondatageek/delivery-forecast/internal/util"
 )
 
 func cmdCount(args []string) error {

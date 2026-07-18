@@ -10,8 +10,8 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"forecasting/internal/linear"
-	"forecasting/internal/util"
+	"github.com/commondatageek/delivery-forecast/internal/linear"
+	"github.com/commondatageek/delivery-forecast/internal/util"
 )
 
 // Options controls which issues feed the cycle-time distribution and the

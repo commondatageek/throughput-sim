@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"forecasting/internal/linear"
+	"github.com/commondatageek/delivery-forecast/internal/linear"
 )
 
 func openTestStore(t *testing.T) *Store {

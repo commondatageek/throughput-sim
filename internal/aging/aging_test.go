@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"forecasting/internal/linear"
+	"github.com/commondatageek/delivery-forecast/internal/linear"
 )
 
 func mustTime(s string) time.Time {
