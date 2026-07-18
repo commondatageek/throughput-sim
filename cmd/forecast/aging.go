@@ -9,10 +9,29 @@ import (
 	"time"
 
 	"github.com/commondatageek/delivery-forecast/internal/aging"
+	"github.com/commondatageek/delivery-forecast/internal/linear"
 	"github.com/commondatageek/delivery-forecast/internal/logx"
 	"github.com/commondatageek/delivery-forecast/internal/sqlite"
 	"github.com/commondatageek/delivery-forecast/internal/util"
 )
+
+// toAgingIssues converts linear.Issue records to aging.Issue.
+func toAgingIssues(issues []linear.Issue) []aging.Issue {
+	out := make([]aging.Issue, len(issues))
+	for i, it := range issues {
+		out[i] = aging.Issue{
+			Identifier:  it.Identifier,
+			Title:       it.Title,
+			Assignee:    it.Assignee,
+			ProjectName: it.ProjectName,
+			StateType:   it.StateType,
+			StateName:   it.StateName,
+			StartedAt:   it.StartedAt,
+			CompletedAt: it.CompletedAt,
+		}
+	}
+	return out
+}
 
 func cmdAging(args []string) error {
 	cmd := flag.NewFlagSet("aging", flag.ExitOnError)
@@ -84,10 +103,12 @@ func cmdAging(args []string) error {
 		return fmt.Errorf("query in-progress: %w", err)
 	}
 
-	cycleTimes := aging.CycleTimes(completed, opts.MinCycleTime)
+	agingCompleted := toAgingIssues(completed)
+
+	cycleTimes := aging.CycleTimes(agingCompleted, opts.MinCycleTime)
 	sort.Float64s(cycleTimes)
 
-	inProgress := aging.InProgressItems(active, today)
+	inProgress := aging.InProgressItems(toAgingIssues(active), today)
 	aging.RankItems(inProgress, cycleTimes)
 
 	sort.Slice(inProgress, func(i, j int) bool {
@@ -96,7 +117,7 @@ func cmdAging(args []string) error {
 
 	var completedItems []aging.Item
 	if *showCompleted {
-		completedItems = aging.CompletedItems(completed, opts.MinCycleTime)
+		completedItems = aging.CompletedItems(agingCompleted, opts.MinCycleTime)
 		aging.RankItems(completedItems, cycleTimes)
 
 		sort.Slice(completedItems, func(i, j int) bool {

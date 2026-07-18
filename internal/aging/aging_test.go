@@ -4,8 +4,6 @@ import (
 	"sort"
 	"testing"
 	"time"
-
-	"github.com/commondatageek/delivery-forecast/internal/linear"
 )
 
 func mustTime(s string) time.Time {
@@ -14,7 +12,7 @@ func mustTime(s string) time.Time {
 }
 
 func TestCycleTimesFiltering(t *testing.T) {
-	issues := []linear.Issue{
+	issues := []Issue{
 		{StartedAt: mustTime("2024-01-01"), CompletedAt: mustTime("2024-01-11")}, // 10 days
 		{StartedAt: mustTime("2024-01-01"), CompletedAt: mustTime("2024-01-02")}, // 1 day
 		{StartedAt: mustTime("2024-01-01"), CompletedAt: mustTime("2024-01-06")}, // 5 days
@@ -46,7 +44,7 @@ func TestCycleTimesFiltering(t *testing.T) {
 
 func TestInProgressItemsAgeDays(t *testing.T) {
 	today := mustTime("2024-03-01")
-	issues := []linear.Issue{
+	issues := []Issue{
 		{Identifier: "ENG-1", StartedAt: mustTime("2024-02-20")}, // 10 days ago
 		{Identifier: "ENG-2", StartedAt: mustTime("2024-02-29")}, // 1 day ago
 		{Identifier: "ENG-3"},                                     // no StartedAt → skip
@@ -65,7 +63,7 @@ func TestInProgressItemsAgeDays(t *testing.T) {
 }
 
 func TestCompletedItemsFiltering(t *testing.T) {
-	issues := []linear.Issue{
+	issues := []Issue{
 		{Identifier: "ENG-1", StartedAt: mustTime("2024-01-01"), CompletedAt: mustTime("2024-01-11")}, // 10 days
 		{Identifier: "ENG-2", StartedAt: mustTime("2024-01-01"), CompletedAt: mustTime("2024-01-02")}, // 1 day
 		{Identifier: "ENG-3", CompletedAt: mustTime("2024-01-10")},                                    // no StartedAt → skip

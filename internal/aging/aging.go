@@ -10,7 +10,6 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/commondatageek/delivery-forecast/internal/linear"
 	"github.com/commondatageek/delivery-forecast/internal/util"
 )
 
@@ -19,7 +18,7 @@ import (
 // `-config` YAML key of the same name).
 type Options struct {
 	// Teams is the `-teams` flag: team keys to filter by; empty means all teams.
-	Teams linear.TeamKeyList
+	Teams []string
 	// SampleStart is the `-sample-start` flag, resolved to a concrete date
 	// (default: today minus 3 months).
 	SampleStart time.Time
@@ -29,6 +28,20 @@ type Options struct {
 	// MinCycleTime is the `-min-cycle-time` flag, resolved from its duration
 	// string (e.g. "5m", "1h", "1d"); zero means no floor.
 	MinCycleTime time.Duration
+}
+
+// Issue is the neutral input record for aging analysis: just the fields
+// CycleTimes/InProgressItems/CompletedItems read. The caller maps its
+// source's fields onto it (the CLI maps linear.Issue).
+type Issue struct {
+	Identifier  string
+	Title       string
+	Assignee    string
+	ProjectName string
+	StateType   string
+	StateName   string
+	StartedAt   time.Time
+	CompletedAt time.Time
 }
 
 // Item is an in-progress issue annotated with its age and percentile rank
@@ -48,7 +61,7 @@ type Item struct {
 // CycleTimes extracts cycle times (started_at → completed_at) from completed
 // issues, excluding issues missing either timestamp and those whose cycle time
 // is below minCycleTime. The returned slice is unsorted.
-func CycleTimes(issues []linear.Issue, minCycleTime time.Duration) []float64 {
+func CycleTimes(issues []Issue, minCycleTime time.Duration) []float64 {
 	var out []float64
 	for _, it := range issues {
 		if it.StartedAt.IsZero() || it.CompletedAt.IsZero() {
@@ -69,7 +82,7 @@ func CycleTimes(issues []linear.Issue, minCycleTime time.Duration) []float64 {
 // InProgressItems converts in-progress issues into Items with AgeDays computed
 // relative to today. Issues missing StartedAt are skipped. AgeDays is floored
 // at zero.
-func InProgressItems(issues []linear.Issue, today time.Time) []Item {
+func InProgressItems(issues []Issue, today time.Time) []Item {
 	var out []Item
 	for _, it := range issues {
 		if it.StartedAt.IsZero() {
@@ -98,7 +111,7 @@ func InProgressItems(issues []linear.Issue, today time.Time) []Item {
 // filter as CycleTimes (missing timestamps, or cycle time below
 // minCycleTime, are skipped). The result is the exact set of issues backing
 // the percentile distribution, each annotated once ranked via RankItems.
-func CompletedItems(issues []linear.Issue, minCycleTime time.Duration) []Item {
+func CompletedItems(issues []Issue, minCycleTime time.Duration) []Item {
 	var out []Item
 	for _, it := range issues {
 		if it.StartedAt.IsZero() || it.CompletedAt.IsZero() {
