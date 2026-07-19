@@ -333,6 +333,15 @@ Optional input to `forecast sim` (e.g. for holidays), pointed at via
 `global` dates are excluded for every engineer; `engineers` dates are
 excluded only for the named engineer.
 
+## Using as a library
+
+The `simulate`, `aging`, `cfd`, and `counts` packages are pure, IO-free, and
+independent of Linear/SQLite, so they're importable on their own —
+`github.com/commondatageek/delivery-forecast/simulate`, etc. — by anyone who
+wants the same Monte Carlo forecasting or cycle-time/CFD/count analysis over
+data from another source. See [DATA_REQUIREMENTS.md](DATA_REQUIREMENTS.md)
+for what each package needs from your data and a short library-usage example.
+
 ## Conventions worth knowing
 
 - `-sample-end`: if explicitly set, it's a calendar date (midnight, that day
