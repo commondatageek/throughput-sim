@@ -4,19 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-Uses [Task](https://taskfile.dev) for automation (`task` CLI required):
+Uses [Just](https://just.systems) for automation (`just` CLI required):
 
 ```bash
-task build       # Compile the forecast binary to bin/
-task test        # Run all Go tests
+just build       # Compile the forecast binary to bin/
+just test        # Run all Go tests
 ```
 
-Manual build (mirrors `task build`):
+Manual build (mirrors `just build`):
 ```bash
 go build -o bin/forecast ./cmd/forecast
 ```
 
-Single Go module (`github.com/commondatageek/delivery-forecast`, see `go.mod`) — no `go.work`. Tests exist in `cmd/forecast`, `simulate`, `aging`, `cfd`, `counts`, `internal/sqlite`, `internal/linear`, and `internal/selfupdate`; `task test` (or `go test ./...`) runs them. No linting is configured.
+Single Go module (`github.com/commondatageek/delivery-forecast`, see `go.mod`) — no `go.work`. Tests exist in `cmd/forecast`, `simulate`, `aging`, `cfd`, `counts`, `internal/sqlite`, `internal/linear`, and `internal/selfupdate`; `just test` (or `go test ./...`) runs them. No linting is configured.
 
 ## Architecture
 

@@ -62,11 +62,11 @@ Once installed, `forecast update` (below) handles future upgrades in place.
 
 ## Build & test
 
-Uses [Task](https://taskfile.dev):
+Uses [Just](https://just.systems):
 
 ```bash
-task build       # compiles bin/forecast
-task test        # go test ./...
+just build       # compiles bin/forecast
+just test        # go test ./...
 ```
 
 Or plain Go:
